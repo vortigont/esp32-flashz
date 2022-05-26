@@ -28,6 +28,7 @@
  */
 
 #include "flashz.hpp"
+#include "esp_task_wdt.h"
 
 #ifdef ARDUINO
 #include "esp32-hal-log.h"
@@ -135,11 +136,13 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
         //ESP_LOGD(TAG, "+inflate chunk - mz_err:%d, dfree:%u, tin:%u, tout:%u", err, dict_free, total_in, total_out);
 
         if (err < 0){
-            ESP_LOGD(TAG, "inflate failure - MZ_ERR: %d, inflate status: %d", err, decomp_status);
+            ESP_LOGW(TAG, "inflate failure - MZ_ERR: %d, inflate status: %d", err, decomp_status);
             return err;         // exit on any error
         }
 
         size_t deco_data_len = (dict_offset - dict_begin) & (TINFL_LZ_DICT_SIZE - 1);
+        if (!dict_offset && !dict_begin)
+            deco_data_len = TINFL_LZ_DICT_SIZE;     // jackpot - a full dict worth of data
 
         /**
          * call the callback if:
@@ -181,6 +184,8 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
         if (!avail_in)
             return err;
 
+        esp_task_wdt_reset();           // feed the dog, flashing highly compressed data (like almost empty FS image) could trigger WDT
+
         // go another inflate round
     }
 }
@@ -194,20 +199,24 @@ bool FlashZ::beginz(size_t size, int command, int ledPin, uint8_t ledOn, const c
     if (!deco.init())       // allocate Inflator memory
         return false;
 
+    mode_z = true;
     return begin(size, command, ledPin, ledOn, label);
 }
 
 
-size_t FlashZ::writez(uint8_t *data, size_t len, bool final){
+size_t FlashZ::writez(const uint8_t *data, size_t len, bool final){
+    if (!mode_z)
+        return write((uint8_t*)data, len);   // this cast to (uint8_t*) is a very dirty hack, but Arduino's Updater lib is missing constness on data pointer
+
     int err = deco.inflate_block_to_cb(data, len, [this](size_t i, const uint8_t* d, size_t s, bool f) int { return flash_cb(i, d, s, f); }, final, FLASH_CHUNK_SIZE);
 
-    if (err == MZ_OK && !final)             // intermediary chunk, ok
+    if (err >= MZ_OK && !final)             // intermediate chunk, ok
         return len;
 
     if (err == MZ_STREAM_END && final)      // we reached end of the z-stream, good
         return len;
 
-    ESP_LOGD(TAG, "Inflate ERROR: %d", err);
+    ESP_LOGE(TAG, "Inflate ERROR: %d", err);
 
     return 0;                               // deco error, assume that no data has been written, signal to the caller that something is wrong
 }
@@ -215,10 +224,12 @@ size_t FlashZ::writez(uint8_t *data, size_t len, bool final){
 void FlashZ::abortz(){
     abort();
     deco.end();
+    mode_z = false;
 }
 
 bool FlashZ::endz(bool evenIfRemaining){
     deco.end();
+    mode_z = false;
     return end(evenIfRemaining);
 }
 
@@ -233,11 +244,11 @@ int FlashZ::flash_cb(size_t index, const uint8_t* data, size_t size, bool final)
         len = size;
 
     if (write((uint8_t*)data, len) != len){     // this cast to (uint8_t*) is a very dirty hack, but Arduino's Updater lib is missing constness on data pointer
-        ESP_LOGD(TAG, "flashz ERROR!");
+        ESP_LOGE(TAG, "flashz ERROR!");
         return 0;                               // if written size is less than requested, consider it as a fatal error, since I can't determine processed delated size
     }
 
-    ESP_LOGD(TAG, "flashed %u bytes", len);
+    ESP_LOG_INFO(TAG, "flashed %u bytes", len);
 
     return len;
 }

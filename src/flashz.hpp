@@ -143,6 +143,7 @@ class FlashZ : public UpdateClass {
     ~FlashZ(){};    // hidden d-tor
 
     //deco_stat_t stat;
+    bool mode_z = false;        // need to keep mode state for async writez() calls
     Inflator deco;
 
     /**
@@ -181,7 +182,7 @@ class FlashZ : public UpdateClass {
          * @param len 
          * @return processed bytes
          */
-        size_t writez(uint8_t *data, size_t len, bool final);
+        size_t writez(const uint8_t *data, size_t len, bool final);
 
         /**
          * @brief abort running inflator and flash update process
