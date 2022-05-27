@@ -98,7 +98,7 @@ void fz_async_handler(AsyncWebServerRequest *request, String filename, size_t in
         // can rely on upload's size only if img is uncompressed
         size_t size = (data[0] == ESP_IMAGE_HEADER_MAGIC) ? request->contentLength() : UPDATE_SIZE_UNKNOWN;
 
-        ESP_LOGD(TAG, "Updating %s, input size:%u, mode_z:%u, magic: %02X", (type == U_FLASH)? "Firmware" : "Filesystem", request->contentLength(), mode_z, data[0]);
+        ESP_LOGI(TAG, "Updating %s, input size:%u, mode_z:%u, magic: %02X", (type == U_FLASH)? "Firmware" : "Filesystem", request->contentLength(), mode_z, data[0]);
 
         if (!(mode_z ? FlashZ::getInstance().beginz(size, type) : FlashZ::getInstance().begin(size, type))){
             return request->send(503, PGmimetxt, FlashZ::getInstance().errorString());

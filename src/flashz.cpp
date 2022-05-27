@@ -248,7 +248,7 @@ int FlashZ::flash_cb(size_t index, const uint8_t* data, size_t size, bool final)
         return 0;                               // if written size is less than requested, consider it as a fatal error, since I can't determine processed delated size
     }
 
-    ESP_LOG_INFO(TAG, "flashed %u bytes", len);
+    ESP_LOGI(TAG, "flashed %u bytes", len);
 
     return len;
 }
