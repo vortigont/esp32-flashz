@@ -1,0 +1,34 @@
+{
+    "name": "esp32-flashz",
+    "frameworks": "arduino",
+    "platforms": ["espressif32"],
+    "version": "1.0.0",
+    "keywords": "ota, zlib, esp32",
+    "description": "ESP32-FlashZ - an arduino library that provides zlib compressed OTA update feature for esp32",
+    "url": "https://github.com/vortigont/esp32-flashz",
+    "authors": [
+        {
+            "name": "Emil Muratov",
+            "url": "https://github.com/vortigont",
+            "email": "gpm@hotplug.ru",
+            "maintainer": true
+        }
+    ],
+    "license": "GPL-2.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/vortigont/espem-flashz.git"
+    },
+    "export": {
+        "include":
+        [
+            "examples/*",
+            "src/*",
+            "CHANGELOG.md",
+            "README.md",
+            "library.json",
+            "library.properties",
+            "LICENCE"
+        ]
+    }
+}
