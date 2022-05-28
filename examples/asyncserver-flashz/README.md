@@ -5,7 +5,7 @@ A complete Platformio project that integrates AsyncWebServer with compressed OTA
 It provides nothing but a very basic HTML form to upload compressed/uncompressed firmware and LittleFS update images.
 
 
-Use PlatformIO to build the project. Set your WiFi credentianls in main.cpp build and upload the code via serial initialy.
+Use PlatformIO to build the project. Set your WiFi credentianls in `main.cpp` build and upload the code via serial initialy.
 
 ```
 pio run -t upload
@@ -18,10 +18,10 @@ Connected to: MyWiFi, IP-address: 192.168.168.25
 Navigate to: http://192.168.168.25/update, and upload raw or zlib-compressed firmware/fs image
 ```
 
-Now you can open http://192.168.168.25/update in the browser see the web form for fw upload. Both compressed/uncompressed images supported, image format will be autodetected on upload. Compressed images must have .zz extension to be allowed for upload via web form.
+Now you can open http://192.168.168.25/update in the browser to access the web form for fw upload. Both compressed/uncompressed images supported, image format will be autodetected on upload. Compressed images must have .zz extension to be allowed for upload via web form.
 
-Let's upload a compressed FileSystem image now. This project provides a python script for PlatformIO that automates compression and OTA update for itself :)
-Open [platformio.ini](platformio.ini) file and find [env:flashz_ota] section. There are two additional parameters there `OTA_compress = true` and `OTA_url = http://192.168.168.25/update`. The first one enables compression for fw/fs images on upload, the second sets OTA URL pointing to your device and replaces serial uploader with OTA. Set `OTA_url` to proper address and upload File system image with `pio run -e flashz_ota -t uploadfs`. Pio builder will try to compress and upload FS image OTA.
+Let's upload a compressed FileSystem image now. This project provides a python script [post_flashz.py](post_flashz.py) for PlatformIO that automates compression and OTA update for itself :)
+Open [platformio.ini](platformio.ini) file and find `[env:flashz_ota]` section. There are two additional parameters there `OTA_compress = true` and `OTA_url = http://192.168.168.25/update`. The first one enables compression for fw/fs images on upload, the second sets `OTA URL` pointing to your device and replaces serial uploader with OTA. Set `OTA_url` to proper address and upload File system image with `pio run -e flashz_ota -t uploadfs`. Pio builder will try to compress and upload FS image OTA.
 
 ```
 Building FS image from 'data' directory to .pio/build/flashz_ota/littlefs.bin
@@ -52,10 +52,17 @@ ets Jun  8 2016 00:22:57
 You can also upload images with [curl](https://curl.se/) console tool
 
 for firmware image
-`curl -v http://$ESPHOST/update -F "img=fw" -F 'name=@.pio/build/flashz_ota/firmware.bin.zz'`
+```
+curl -v http://$ESPHOST/update -F "img=fw" -F 'name=@.pio/build/flashz_ota/firmware.bin.zz'
+```
 
 for fs image
-`curl -v http://$ESPHOST/update -F "img=fs" -F 'name=@.pio/build/flashz_ota/littlefs.bin.zz'`
+```
+curl -v http://$ESPHOST/update -F "img=fs" -F 'name=@.pio/build/flashz_ota/littlefs.bin.zz'
+```
 
 to compress and upload image on-the-fly with [pigz](https://zlib.net/pigz/) tool
-`pigz -9kzc .pio/build/flashz/firmware.bin | curl -v http://$ESPHOST/update -F "img=fw" -F file=@-`
+```
+pigz -9kzc .pio/build/flashz/firmware.bin | curl -v http://$ESPHOST/update -F "img=fw" -F file=@-
+pigz -9kzc .pio/build/flashz/littlefs.bin | curl -v http://$ESPHOST/update -F "img=fs" -F file=@-
+```

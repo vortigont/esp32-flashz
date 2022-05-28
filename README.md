@@ -1,7 +1,7 @@
 ESP32-FlashZ - an arduino library that provides zlib compressed OTA update feature for esp32
 ======
 
-__[EXAMPLES](/examples/README.md) | [![PlatformIO
+__[EXAMPLES](/examples/README.md) |__ [![PlatformIO
  CI](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml/badge.svg)](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml)
 
 
@@ -25,6 +25,14 @@ I wrote this lib just for fun to get the idea of miniz functions hidden in esp32
 
 
 Check [examples](/examples) to get more idea on how to intergate this lib into platformio projects
+
+### Compatibility
+| Platform    | Firmware           | Filesystem         |
+|-------------|--------------------|--------------------|
+|ESP32        | :heavy_check_mark: | :heavy_check_mark: |
+|ESP32-S2     | :heavy_check_mark: | :heavy_check_mark: |
+|ESP32-S3     | not tested         | not tested         |
+|ESP32-c3     | :heavy_check_mark: | :heavy_check_mark: |
 
 
 ### License
