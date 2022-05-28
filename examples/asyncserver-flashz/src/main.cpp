@@ -55,7 +55,7 @@ void setup() {
     Serial.print(".");
   }
   Serial.printf("\nConnected to: %s, IP-address: %s", ssid, WiFi.localIP().toString().c_str());
-  Serial.printf("\nNavigate to: http://%s/%s, and upload raw or zlib-compressed firmware/fs image", WiFi.localIP().toString().c_str(), ota_url);
+  Serial.printf("\nNavigate to: http://%s%s, and upload raw or zlib-compressed firmware/fs image", WiFi.localIP().toString().c_str(), ota_url);
 
   /*
    register FlashZ OTA handler. It provides simple html upload form for GET handler
