@@ -48,13 +48,16 @@ def ota_upload(source, target, env):
     file_path = str(source[0])
     print ("Found OTA_url option, will attempt over-the-air upload")
 
-    compress = env.GetProjectOption('OTA_compress')
-    if compress:
-        print("Found OTA_compress option")
-        zlib_compress(file_path)
+    try:
+        compress = env.GetProjectOption('OTA_compress')
+        if compress in ("yes", "true", "1"):
+            print("Found OTA_compress option")
+            zlib_compress(file_path)
+            if (isfile(file_path + ".zz")):
+                file_path += ".zz"
+    except:
+        print ("OTA_compress not found, NOT using compression")
 
-    if (isfile(file_path + ".zz")):
-        file_path += ".zz"
 
     url = env.GetProjectOption('OTA_url')
 
