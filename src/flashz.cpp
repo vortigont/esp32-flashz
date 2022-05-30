@@ -208,7 +208,7 @@ size_t FlashZ::writez(const uint8_t *data, size_t len, bool final){
     if (!mode_z)
         return write((uint8_t*)data, len);   // this cast to (uint8_t*) is a very dirty hack, but Arduino's Updater lib is missing constness on data pointer
 
-    int err = deco.inflate_block_to_cb(data, len, [this](size_t i, const uint8_t* d, size_t s, bool f) int { return flash_cb(i, d, s, f); }, final, FLASH_CHUNK_SIZE);
+    int err = deco.inflate_block_to_cb(data, len, [this](size_t i, const uint8_t* d, size_t s, bool f) -> int { return flash_cb(i, d, s, f); }, final, FLASH_CHUNK_SIZE);
 
     if (err >= MZ_OK && !final)             // intermediate chunk, ok
         return len;
