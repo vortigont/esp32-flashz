@@ -19,9 +19,12 @@
         "type": "git",
         "url": "https://github.com/vortigont/espem-flashz.git"
     },
-    "build": {
-        "libCompatMode": "strict"
-    },
+    "dependencies":
+    [
+        {"name": "Update", "platforms": "espressif32"},
+        {"name": "Ticker", "platforms": "espressif32"}
+    ],
+    "build": { "libCompatMode": "strict" },
     "export": {
         "include":
         [
