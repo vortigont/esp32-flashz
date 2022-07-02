@@ -33,8 +33,13 @@
 #include <Update.h>
 #include <functional>
 
+#ifndef ESP_IMAGE_HEADER_MAGIC
+#define ESP_IMAGE_HEADER_MAGIC  0xE9
+#endif
+#define GZ_HEADER               0x1F
+#define ZLIB_HEADER             0x78
 
-#define FLASH_CHUNK_SIZE 8192        // SPI NOR erase sector size is 4096 bytes, so let's take 2 sectors
+#define FLASH_CHUNK_SIZE 2*SPI_FLASH_SEC_SIZE        // SPI NOR erase sector size is 4096 bytes, so let's take 2 sectors
 
 // same defines as in miniz.h, excluded in Arduino (todo: add some guards here)
 /* Return status codes. MZ_PARAM_ERROR is non-standard. */
@@ -53,10 +58,8 @@ enum
 };
 
 struct deco_stat_t {
-    int fw_type;
-    size_t fw_size;
-    size_t comp_read;
-    size_t decomp_wrt;
+    size_t in_bytes;
+    size_t out_bytes;
 };
 
 
@@ -112,6 +115,8 @@ public:
      */
     void end();
 
+    void getstat(deco_stat_t &stat);
+
     /**
      * @brief inflate input buffer into internal dict an call the callback function on inflated data
      * by default callback is called only when output dict is full (32k), so it might skip a call if input block
@@ -127,6 +132,8 @@ public:
      */
     int inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_t callback, bool final = false, size_t chunk_size = TINFL_LZ_DICT_SIZE);
 
+
+    int inflate_stream_to_cb(Stream &data, int size, inflate_cb_t callback, size_t chunk_size = TINFL_LZ_DICT_SIZE);
 };
 
 
@@ -174,7 +181,7 @@ class FlashZ : public UpdateClass {
         bool beginz(size_t size=UPDATE_SIZE_UNKNOWN, int command = U_FLASH, int ledPin = -1, uint8_t ledOn = LOW, const char *label = NULL);
 
         /**
-         * @brief         Writes a buffer to the flash and increments the address
+         * @brief Writes a buffer to the flash and increments the address
          * Returns the amount of porcessed compressed bytes. Decompressed written size is usually larger
          * returnes zero in case of any decompression error 
          * 
@@ -183,6 +190,16 @@ class FlashZ : public UpdateClass {
          * @return processed bytes
          */
         size_t writez(const uint8_t *data, size_t len, bool final);
+
+        /**
+         * @brief Read zlib compressed data from stream, decompress and write it to flash
+         * size of the stream must be known in order to signal zlib inflator last chunk
+         * 
+         * @param data Stream object, usually data from a tcp socket
+         * @param len total length of compressed data to read from stream
+         * @return size_t number of bytes processed from a stream
+         */
+        size_t writezStream(Stream &data, size_t len);
 
         /**
          * @brief abort running inflator and flash update process

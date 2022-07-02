@@ -39,7 +39,12 @@
 // ESP32 log tag
 static const char *TAG __attribute__((unused)) = "FLASHZ";
 
+#define INFLATOR_STREAM_BUFF_SIZE   128
+#define INFLATOR_STREAM_DELAY_MS    5
+#define INFLATOR_STREAM_DELAY_CTR   50
 
+
+// Inflator class implementation
 bool Inflator::init(){
     rdy = false;
 
@@ -112,13 +117,14 @@ int Inflator::inflate(bool final){
     if (decomp_status < 0)
         return MZ_DATA_ERROR; /* Stream is corrupted (there could be some uncompressed data left in the output dictionary - oh well). */
 
-    if ((decomp_status == TINFL_STATUS_NEEDS_MORE_INPUT) && final )    /* if delator need more input and we demand it's a final call, than something must be wrong with a stream */
+    if ((decomp_status == TINFL_STATUS_NEEDS_MORE_INPUT) && final )    /* if deflator need more input and we demand it's a final call, than something must be wrong with a stream */
         return MZ_STREAM_ERROR;
 
-    if (decomp_status == TINFL_STATUS_HAS_MORE_OUTPUT)    /* if delator can't fit more data to the output buf, than need to flush a buff */
+    if (decomp_status == TINFL_STATUS_HAS_MORE_OUTPUT)    /* if deflator can't fit more data to the output buf, than need to flush a buff */
         return MZ_NEED_DICT;
 
-    return ((decomp_status == TINFL_STATUS_DONE) && (final)) ? MZ_STREAM_END : MZ_OK;
+    return MZ_OK;       // this should be the only
+    //return ((decomp_status == TINFL_STATUS_DONE) && (final)) ? MZ_STREAM_END : MZ_OK;
 };
 
 int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_t callback, bool final, size_t chunk_size){
@@ -191,11 +197,46 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
 }
 
 
+int Inflator::inflate_stream_to_cb(Stream &data, int size, inflate_cb_t callback, size_t chunk_size){
+    uint8_t buff[INFLATOR_STREAM_BUFF_SIZE];    // stream buffer
+
+    int ctr = INFLATOR_STREAM_DELAY_CTR;        // stream wait/retry counter
+    do {
+        size_t available = data.available();
+        if (!available && size){
+            delay(INFLATOR_STREAM_DELAY_MS);
+            if (--ctr)
+                continue;
+            else
+                return MZ_STREAM_ERROR;
+        }
+        ctr = INFLATOR_STREAM_DELAY_CTR;
+
+        // fill the buff from a stream
+        int len = data.readBytes(buff, (available > sizeof(buff)) ? sizeof(buff) : available);
+
+        // inflate buff
+        int err = inflate_block_to_cb(buff, len, callback, (len == size), chunk_size);
+        if (err < 0)
+            return err;
+
+        size -= len;
+    } while(size > 0);
+
+    //ESP_LOGW(TAG, "inflate stream %d bytes left", size);
+    return size ? MZ_STREAM_ERROR : MZ_STREAM_END;
+}
+
+void Inflator::getstat(deco_stat_t &stat){
+    stat.in_bytes = total_in;
+    stat.out_bytes = total_out;
+}
+
+
+
 /**    FlashZ Class implementation    **/
 
 bool FlashZ::beginz(size_t size, int command, int ledPin, uint8_t ledOn, const char *label){
-    //stat = {0, 0, 0, 0};
-
     if (!deco.init())       // allocate Inflator memory
         return false;
 
@@ -203,17 +244,13 @@ bool FlashZ::beginz(size_t size, int command, int ledPin, uint8_t ledOn, const c
     return begin(size, command, ledPin, ledOn, label);
 }
 
-
 size_t FlashZ::writez(const uint8_t *data, size_t len, bool final){
     if (!mode_z)
         return write((uint8_t*)data, len);   // this cast to (uint8_t*) is a very dirty hack, but Arduino's Updater lib is missing constness on data pointer
 
-    int err = deco.inflate_block_to_cb(data, len, [this](size_t i, const uint8_t* d, size_t s, bool f) -> int { return flash_cb(i, d, s, f); }, final, FLASH_CHUNK_SIZE);
+    int err = deco.inflate_block_to_cb(data, len, [this](size_t i, const uint8_t* d, size_t s, bool f) -> int { return flash_cb(i, d, s, f); }, final);
 
-    if (err >= MZ_OK && !final)             // intermediate chunk, ok
-        return len;
-
-    if (err == MZ_STREAM_END && final)      // we reached end of the z-stream, good
+    if (err >= MZ_OK)                       // intermediate or last chunk, ok
         return len;
 
     ESP_LOGE(TAG, "Inflate ERROR: %d", err);
@@ -237,18 +274,28 @@ int FlashZ::flash_cb(size_t index, const uint8_t* data, size_t size, bool final)
     if (!size)
         return 0;
 
-    size_t len;
-    if (size >= FLASH_CHUNK_SIZE && !final)
-        len = FLASH_CHUNK_SIZE;
-    else
-        len = size;
-
-    if (write((uint8_t*)data, len) != len){     // this cast to (uint8_t*) is a very dirty hack, but Arduino's Updater lib is missing constness on data pointer
-        ESP_LOGE(TAG, "flashz ERROR!");
-        return 0;                               // if written size is less than requested, consider it as a fatal error, since I can't determine processed delated size
+    // try to align writes to flash sector size
+    size_t len = size <= SPI_FLASH_SEC_SIZE ? size : size - (size % SPI_FLASH_SEC_SIZE);
+    size_t _w = write((uint8_t*)data, len);     // this cast to (uint8_t*) is a very dirty hack, but Arduino's Updater lib is missing constness on data pointer
+    if (_w != len){
+        ESP_LOGE(TAG, "ERROR, flashed %d of %d bytes chunk!", _w, len);
+        return 0;                               // if written size is less than requested, consider it as a fatal error, since I can't determine proccessed delated size
     }
 
     ESP_LOGI(TAG, "flashed %u bytes", len);
 
     return len;
+}
+
+size_t FlashZ::writezStream(Stream &data, size_t len){
+    if (!mode_z)
+        return writeStream(data);
+
+    int err = deco.inflate_stream_to_cb(data, len, [this](size_t i, const uint8_t* d, size_t s, bool f) -> int { return flash_cb(i, d, s, f); });
+
+    ESP_LOGI(TAG, "inflate stream err status: %d", err);
+
+    deco_stat_t s;
+    deco.getstat(s);
+    return s.in_bytes;
 }
