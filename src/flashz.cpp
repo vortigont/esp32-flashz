@@ -137,17 +137,18 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
     decomp_flags &= ~( TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF );  // use internal ring buffer for decompression
 
     for (;;){
-
+        unsigned int _to = total_out;
         int err = inflate(final);                                   // inflate as much in-data as possible
-        //ESP_LOGD(TAG, "+inflate chunk - mz_err:%d, dfree:%u, tin:%u, tout:%u", err, dict_free, total_in, total_out);
 
         if (err < 0){
             ESP_LOGW(TAG, "inflate failure - MZ_ERR: %d, inflate status: %d", err, decomp_status);
-            return err;         // exit on any error
+            return err;                                             // exit on any error
         }
 
         size_t deco_data_len = (dict_offset - dict_begin) & (TINFL_LZ_DICT_SIZE - 1);
-        if (!dict_offset && !dict_begin)
+        //ESP_LOGD(TAG, "+inflate chunk - mz_err:%d, ddl:%d, dfree:%u, tin:%u, tout:%u", err, deco_data_len, dict_free, total_in, total_out);
+
+        if (!dict_offset && !dict_begin && total_out > _to)
             deco_data_len = TINFL_LZ_DICT_SIZE;     // jackpot - a full dict worth of data
 
         /**
@@ -217,8 +218,10 @@ int Inflator::inflate_stream_to_cb(Stream &data, int size, inflate_cb_t callback
 
         // inflate buff
         int err = inflate_block_to_cb(buff, len, callback, (len == size), chunk_size);
-        if (err < 0)
+        if (err < 0){
+            //ESP_LOGI(TAG, "compressed buff: %02X%02X%02X%02X%02X%02X", buff[0], buff[1], buff[2], buff[3], buff[4], buff[5]);
             return err;
+        }
 
         size -= len;
     } while(size > 0);
@@ -278,7 +281,8 @@ int FlashZ::flash_cb(size_t index, const uint8_t* data, size_t size, bool final)
     size_t len = size <= SPI_FLASH_SEC_SIZE ? size : size - (size % SPI_FLASH_SEC_SIZE);
     size_t _w = write((uint8_t*)data, len);     // this cast to (uint8_t*) is a very dirty hack, but Arduino's Updater lib is missing constness on data pointer
     if (_w != len){
-        ESP_LOGE(TAG, "ERROR, flashed %d of %d bytes chunk!", _w, len);
+        //ESP_LOGI(TAG, "magic: %02X%02X%02X%02X%02X%02X", data[0], data[1], data[2], data[3], data[4], data[5]);
+        ESP_LOGE(TAG, "ERROR, flashed %d of %d bytes chunk, err: %s!", _w, len, errorString());
         return 0;                               // if written size is less than requested, consider it as a fatal error, since I can't determine proccessed delated size
     }
 
