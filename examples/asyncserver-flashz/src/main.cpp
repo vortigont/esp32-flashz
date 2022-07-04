@@ -30,7 +30,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <LittleFS.h>
-#include "flashz-async.hpp"
+#include "flashz-http.hpp"
 
 
 #define BAUD_RATE       115200  // serial port baud rate (for debug)
@@ -65,7 +65,7 @@ void setup() {
 
   /*
     If you want to handle GET requests for OTA url on your own, than check
-    for two other functions in flashz-async.hpp
+    for other functions in flashz-http.hpp
   */
 
   // try to mount LittleFS and serve all static files from root /
