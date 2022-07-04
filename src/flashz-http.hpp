@@ -27,21 +27,37 @@
  *  https://opensource.org/licenses/GPL-2.0
  */
 
+/*
+a set of helper functions to handle compressed OTA updates via HTTP
+
+build_time flags could be used to include only required functions,
+this may introduce additional library dependency, i.e. AsyncWebServer
+
+FZ_HTTP_ASYNC    - build with AsyncWebServer support handlers
+*/
+
 #pragma once
 
+#ifdef FZ_HTTP_ASYNC
 #include <ESPAsyncWebServer.h>
-#include "flashz.hpp"
+#endif  // #ifdef FZ_HTTP_ASYNC
 
-#ifndef ESP_IMAGE_HEADER_MAGIC
-#define ESP_IMAGE_HEADER_MAGIC  0xE9
-#endif
-#define GZ_HEADER               0x1F
-#define ZLIB_HEADER             0x78
+#define REBOOT_TIMEOUT  5000
 
 static const char PGmimehtml[] = "text/html; charset=utf-8";
 static const char PGmimetxt[]  = "text/plain";
 
+enum class fz_http_err_t:int {
+    write_err = -6,
+    bad_start = -5,
+    bad_stream = -4,
+    bad_size = -3,
+    httpcode_err = -2,
+    bad_param = -1,
+    ok = 0
+};
 
+#ifdef FZ_HTTP_ASYNC
 /**
  * @brief register OTA URL within AsyncServer
  * - provides a simple file upload form for FW/FW file images, could be raw *.bin or *.zz zlib compressed files
@@ -72,3 +88,15 @@ void fz_async_register_upload(AsyncWebServer &srv, const char* url);
  * @param len 
  */
 void fz_async_handler(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
+#endif  // #ifdef FZ_HTTP_ASYNC
+
+/**
+ * @brief fetch (possibly compressed) image file via http and flash
+ * compressed image format is autodetected
+ * 
+ * @param url - source URL for firmware file (https is not supported)
+ * @param imgtype - image file type U_FLASH (0 - default) or U_SPIFFS
+ * @param autoreboot - reboot MCU after specified ms if flash was successfull, disable autoreboot if set to '0'
+ * @return fz_http_err_t - returns error code
+ */
+fz_http_err_t fz_http_client(const char* url, int imgtype = 0, unsigned autoreboot = REBOOT_TIMEOUT);
