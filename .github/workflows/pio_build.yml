@@ -18,6 +18,7 @@ jobs:
       matrix:
         example:
           - "examples/asyncserver-flashz"
+          - "examples/httpserver-flashz"
 
     steps:
     - uses: actions/checkout@v2

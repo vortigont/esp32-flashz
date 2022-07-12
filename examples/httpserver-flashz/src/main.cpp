@@ -30,7 +30,7 @@
 
 
 /*
- An example on how to implement a simple update web page with AsyncWebServer
+ An example on how to implement a simple update web page with ESP32 WebServer
  and FlashZ lib than can handle both compressed and uncompressed firmware/filesystem OTA updates
 
  - set you WiFi creds below
@@ -40,12 +40,6 @@
  - upload zlib compressed firmware
  - or specify remote URL to download and update the fw image from
  - or use platformio's env's to do automated build/compress/upload fw tests
-
- NOTE: ESP32-FLashZ lib does not include AsyncWebServer support by default
- due to introduced dependency to external libs.
- To include it use build-time flag FZ_WITH_ASYNCSRV.
- See included platformio.ini file for build environment setup.
-
 */
 
 #include <Arduino.h>
@@ -56,19 +50,13 @@
 
 #define BAUD_RATE       115200  // serial port baud rate (for debug)
 
-// Set your WiFi AP credentials here
 const char* ssid = "MySSID";
 const char* password = "MyPassword";
 const char* ota_url = "/update";        // OTA form URL
 
-AsyncWebServer server(80);              // AsyncWebServer instance
+WebServer server(80);                   // ESP32 WebServer instance
 
-
-/*
-  FlashZ http helper class, it will handle interaction with AsyncWebServer
-  file upload and FlashZ decompressor/writer
-*/
-FlashZhttp    fz;
+FlashZhttp fz;
 
 // MAIN Setup
 void setup() {
@@ -108,7 +96,6 @@ void setup() {
   */
   fz.handle_ota_form(&server, ota_url);
 
-
   /*
     If you implement you own handlers for the page/form data parsing
     than you need to register file upload handler for the posted data.
@@ -116,17 +103,17 @@ void setup() {
     FlashZhttp::file_upload - it has a type of AsyncWebServer callback function
   */
 
-  // try to mount LittleFS and serve all static files from root FS /
+  // try to mount LittleFS and serve all static files from root /
   if (LittleFS.begin()){
-    server.serveStatic("/", LittleFS, "/")
-          .setDefaultFile("index.html");
+    server.serveStatic("/", LittleFS, "/");
   }
 
   server.begin();
 }
 
+
 // MAIN loop
 void loop() {
-  // just do nothing here
-  delay(10);
+  server.handleClient();
+  delay(1);
 }
