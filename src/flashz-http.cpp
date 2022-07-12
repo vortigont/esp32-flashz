@@ -29,7 +29,6 @@
 
 #include "flashz-http.hpp"
 #include "flashz.hpp"
-#include <Ticker.h>
 
 #include <HTTPClient.h>
 
@@ -43,7 +42,6 @@
 // ESP32 log tag
 static const char *TAG __attribute__((unused)) = "FZ-HTTP";
 
-#define FZ_REBOOT_TIMEOUT       5000
 #define FZ_HTTP_CLIENT_DELAY    1000
 
 static const char PGotaform[]  = R"===(
@@ -52,13 +50,14 @@ static const char PGotaform[]  = R"===(
     <meta charset='utf-8' />
     <meta name='viewport' content='width=device-width,initial-scale=1'/>
 </head><body>
+<h2>ESP32 FlashZ OTA form</h2><br>
 <form method="post" action="#" enctype='multipart/form-data'>
     <input type="radio" id="imgtype1" name="img" value="fw" checked>
     <label for="imgtype1">Firmware</label>
     <input type="radio" id="imgtype2" name="img" value="fs">
     <label for="imgtype2">FileSystem</label><br>
-    <input type='file' accept='.bin, .zz' name='file'>
-    <input type='submit' value='Upload'>
+    <input type='file' accept='.bin, .zz' name="file">
+    <button type='submit'>Upload</button>
 </form><hr>
 <form method="post" action="#" enctype='multipart/form-data'>
     <input type="radio" id="imgtype1" name="img" value="fw" checked>
@@ -67,56 +66,64 @@ static const char PGotaform[]  = R"===(
     <label for="imgtype2">FileSystem</label><br>
     <input type='input' id="url" name='url'>
     <label for="url">Download firmware URL</label>
-    <input type='submit' value='Update'>
+    <button type='submit'>Update</button>
 </form></body></html>
 )===";
 
 static const char PGimg[]  = "img";
 static const char PGurl[]  = "url";
 
-#ifdef FZ_HTTP_ASYNC
-struct callback_arg_t {
-    int type;
-    String url;
-};
+void FlashZhttp::fz_http_trigger(FlashZhttp *fz){ fz->http_get(); }
 
-callback_arg_t *cb;
-
-void fz_async_http_trigger(){ if (!cb) return; fz_http_client(cb->url.c_str(), cb->type); delete cb; cb = nullptr; }
-
-void fz_async_register_ota(AsyncWebServer &srv, const char* url){
-
-    srv.on(url, HTTP_GET, [](AsyncWebServerRequest *request){ request->send(200, PGmimehtml, PGotaform); });
-    fz_async_register_upload(srv, url);
+#ifdef FZ_WITH_ASYNCSRV
+void FlashZhttp::provide_ota_form(AsyncWebServer *srv, const char* url){
+    srv->on(url, HTTP_GET, [](AsyncWebServerRequest *request){ request->send(200, PGmimehtml, PGotaform); });
 }
 
-void fz_async_register_upload(AsyncWebServer &srv, const char* url){
-    srv.on(url, HTTP_POST,
-        [](AsyncWebServerRequest *request){
+void FlashZhttp::handle_ota_form(AsyncWebServer *srv, const char* url){
+    srv->on(url, HTTP_POST,
+        // handle form data
+        [this](AsyncWebServerRequest *request){
             // check if a post is for URL fw download form or post-file upload
             if(request->hasParam(PGurl, true)){
+                if (cb){ delete cb; }
                 cb = new callback_arg_t;
+                if (!cb) return;
                 cb->url = request->getParam(PGurl, true)->value();
                 cb->type = request->getParam(PGimg, true)->value() == "fs" ? U_SPIFFS : U_FLASH;
-                Ticker *urlota = new Ticker;        // postpone client-OTA, it can't be run in async call-back
-                urlota->attach_ms(FZ_HTTP_CLIENT_DELAY, fz_async_http_trigger);
-                request->send(200, PGmimetxt, "Attempting OTA from URL in background");
+
+                // postpone client-OTA, it can't be run in async call-back
+                if (t)
+                    t->detach();
+                else
+                    t = new Ticker;
+
+                if (!t) return;
+                t->attach_ms(FZ_HTTP_CLIENT_DELAY, fz_http_trigger, this);
+                return request->send(200, PGmimetxt, "Attempting OTA from URL in background");
                 // dyn objects leaks mem but I do not care, 'cause mcu will reboot on success
             } else {
                 if (FlashZ::getInstance().hasError()) {
                     request->send(503, PGmimetxt, "Update FAILED");
                 } else {
-                    Ticker *selfreboot = new Ticker;
-                    selfreboot->attach_ms(REBOOT_TIMEOUT, [](){ ESP.restart(); });
+                    if (rst_timeout){
+                        if (t)
+                            t->detach();
+                        else
+                            t = new Ticker;
+
+                        t->attach_ms(rst_timeout, [](){ ESP.restart(); });
+                    }
                     request->send(200, PGmimetxt, "OTA complete, autoreboot in 5 sec...");
                 }
             }
         },
-        fz_async_handler        // handle file upload
+        // handle file upload
+        [this](AsyncWebServerRequest *r, String f, size_t i, uint8_t *d, size_t l, bool fin){ this->file_upload(r, f, i, d, l, fin); }
     );
 }
 
-void fz_async_handler(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+void FlashZhttp::file_upload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
 
     // first chunk of body data
     if (!index) {
@@ -129,15 +136,15 @@ void fz_async_handler(AsyncWebServerRequest *request, String filename, size_t in
             type = request->getParam(PGimg, true)->value() == "fs" ? U_SPIFFS : U_FLASH;
         } else{
             // no image type specified, try to autodetect
-            if (data[0] == ESP_IMAGE_HEADER_MAGIC || mode_z)        // can't detect what is insize zlib, so assume it's a fw image (won't owerwrite chip's FS)
+            if (mode_z || (data[0] == ESP_IMAGE_HEADER_MAGIC))        // can't detect what is insize zlib, so assume it's a fw image (won't owerwrite chip's FS)
                 type = U_FLASH;
             else
                 type = U_SPIFFS;
-
 //          return request->send(400, PGmimetxt, F("Not an FW image or img type is unknown"));
         }
 
         // can rely on upload's size only if img is uncompressed
+        // request->contentLength() return size of the whole post body, it is larger than uploaded file size
         size_t size = (data[0] == ESP_IMAGE_HEADER_MAGIC) ? request->contentLength() : UPDATE_SIZE_UNKNOWN;
 
         ESP_LOGI(TAG, "Updating %s, input size:%u, mode_z:%u, magic: %02X", (type == U_FLASH)? "Firmware" : "Filesystem", request->contentLength(), mode_z, data[0]);
@@ -168,13 +175,13 @@ void fz_async_handler(AsyncWebServerRequest *request, String filename, size_t in
     }
 }
 
-#endif  // #ifdef FZ_HTTP_ASYNC
+#endif // #ifdef FZ_WITH_ASYNC
 
-fz_http_err_t fz_http_client(const char* url, int imgtype, unsigned autoreboot){
+fz_http_err_t FlashZhttp::http_get(const char* url, int imgtype){
     if (!url)
         return fz_http_err_t::bad_param;
 
-    ESP_LOGI(TAG, "Start client updateurl:%s", url);
+    ESP_LOGI(TAG, "Update from URL:%s", url);
 
     HTTPClient http;
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -227,10 +234,147 @@ fz_http_err_t fz_http_client(const char* url, int imgtype, unsigned autoreboot){
 
     http.end();
 
-    if (autoreboot){
-        Ticker *selfreboot = new Ticker;
-        selfreboot->attach_ms(autoreboot, [](){ ESP.restart(); });
+    if (rst_timeout){
+        if (rst_timeout){
+            if (t)
+                t->detach();
+            else
+                t = new Ticker;
+
+            t->attach_ms(rst_timeout, [](){ ESP.restart(); });
+        }
     }
 
     return fz_http_err_t::ok;
+}
+
+fz_http_err_t FlashZhttp::http_get(){
+    if (!cb) return fz_http_err_t::bad_param;
+    fz_http_err_t e = http_get(cb->url.c_str(), cb->type);
+    delete cb;
+    cb = nullptr;
+    return e;
+};
+
+#ifndef FZ_NO_WEBSRV
+void FlashZhttp::provide_ota_form(WebServer *server, const char* url){
+    // Simple OTA-Update Form
+    server->on(url, HTTP_GET, [server](){ server->send(200, PGmimehtml, PGotaform ); });
+}
+
+void FlashZhttp::handle_ota_form(WebServer *server, const char* url){
+    // handler for the /update form POST (once file upload finishes or http-client form)
+    server->on(url, HTTP_POST, [server, this](){
+        if (server->hasArg(PGurl)){
+            if (cb){ delete cb; }
+            cb = new callback_arg_t;
+            cb->url = server->arg(PGurl);
+            cb->type = server->arg(PGimg) == "fs" ? U_SPIFFS : U_FLASH;
+            
+            // postpone client-OTA, it can't be run in async call-back
+            if (t)
+                t->detach();
+            else
+                t = new Ticker;
+
+            t->attach_ms(FZ_HTTP_CLIENT_DELAY, fz_http_trigger, this);
+            return server->send(200, PGmimetxt, "Attempting OTA from URL in background");
+            // dyn objects leaks mem but I do not care, 'cause mcu will reboot on success
+        } else {
+            if (FlashZ::getInstance().hasError()) {
+                server->send(500, FPSTR(PGmimetxt), F("UPDATE FAILED"));
+            } else {
+                if (rst_timeout){
+                    if (t)
+                        t->detach();
+                    else
+                        t = new Ticker;
+
+                    t->attach_ms(rst_timeout, [](){ ESP.restart(); });
+                }
+
+                server->client().setNoDelay(true);
+                server->send(200, FPSTR(PGmimetxt), F("OTA complete, autoreboot in 5 sec..."));
+                server->client().stop();
+            }
+        }
+    }, [this, server](){ this->file_upload(server); } );
+}
+
+void FlashZhttp::file_upload(WebServer *server){
+    HTTPUpload& upload = server->upload();
+
+    switch (upload.status){
+/*
+        // first chunk of body data
+        case HTTPUploadStatus::UPLOAD_FILE_START :
+            ESP_LOGI(TAG, "START updating");
+            break;
+*/
+        // file data
+        case HTTPUploadStatus::UPLOAD_FILE_WRITE : {
+             // if first chunk
+            if (!upload.totalSize){
+                bool mode_z = (upload.buf[0] == ZLIB_HEADER);    // check if we have a compressed image
+                int type;
+
+                if (server->hasArg(PGimg)){
+                    // image type is specified in the form data
+                    type = server->arg(PGimg) == "fs" ? U_SPIFFS : U_FLASH;
+                } else{
+                    // no image type specified, try to autodetect
+                    if (upload.buf[0] == ESP_IMAGE_HEADER_MAGIC || mode_z)        // can't detect what is insize zlib, so assume it's a fw image (won't owerwrite chip's FS)
+                        type = U_FLASH;
+                    else
+                        type = U_SPIFFS;
+                }
+
+                ESP_LOGI(TAG, "Begin updating %s, mode_z:%u, magic: %02X", (type == U_FLASH)? "Firmware" : "Filesystem", mode_z, upload.buf[0]);
+
+                if (!(mode_z ? FlashZ::getInstance().beginz(UPDATE_SIZE_UNKNOWN, type) : FlashZ::getInstance().begin(UPDATE_SIZE_UNKNOWN, type))){
+                    return server->send(503, PGmimetxt, FlashZ::getInstance().errorString());
+                }
+            }
+
+            //deco_stat_t s;
+            //FlashZ::getInstance().getstat(s);
+            //int bytes_left = upload.totalSize - s.in_bytes - upload.currentSize;
+            if(FlashZ::getInstance().writez(upload.buf, upload.currentSize, false) != upload.currentSize){
+                ESP_LOGW(TAG, "OTA failed in progress: %s", FlashZ::getInstance().errorString());
+                server->send(503, PGmimetxt, FlashZ::getInstance().errorString());
+                server->client().stop();
+                return FlashZ::getInstance().abortz();
+            }
+            //ESP_LOGI(TAG, "Updating %s, tsize:%u, len:%u", "Firmware", upload.totalSize, upload.currentSize);
+            break;
+        }
+
+        case HTTPUploadStatus::UPLOAD_FILE_END : {
+            if(FlashZ::getInstance().writez(upload.buf, upload.currentSize, true) != upload.currentSize){
+                ESP_LOGW(TAG, "OTA failed in progress: %s", FlashZ::getInstance().errorString());
+                //server->send(503, PGmimetxt, FlashZ::getInstance().errorString());
+                return FlashZ::getInstance().abortz();
+            }
+            if(FlashZ::getInstance().endz()){
+                ESP_LOGI(TAG, "Update Success: %u bytes", upload.totalSize);
+                //server->send(200, PGmimetxt, "Update complete");
+            } else {
+                ESP_LOGW(TAG, "Update failed to complete");
+                //server->send(200, PGmimetxt, "Update failed to complete");
+            }
+            break;
+        }
+
+        //case HTTPUploadStatus::UPLOAD_FILE_ABORTED
+        default : {
+            FlashZ::getInstance().abortz();
+            ESP_LOGW(TAG, "Update aborted");
+        }
+    }
+}
+#endif // #ifndef FZ_NO_WEBSRV
+
+unsigned FlashZhttp::autoreboot(unsigned t){
+    t = rst_timeout;
+    return t;
 }
