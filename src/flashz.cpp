@@ -123,8 +123,8 @@ int Inflator::inflate(bool final){
     if (decomp_status == TINFL_STATUS_HAS_MORE_OUTPUT)    /* if deflator can't fit more data to the output buf, than need to flush a buff */
         return MZ_NEED_DICT;
 
-    return MZ_OK;       // this should be the only
-    //return ((decomp_status == TINFL_STATUS_DONE) && (final)) ? MZ_STREAM_END : MZ_OK;
+    //return MZ_OK;       // this should be the only
+    return ((decomp_status == TINFL_STATUS_DONE) && (final)) ? MZ_STREAM_END : MZ_OK;
 };
 
 int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_t callback, bool final, size_t chunk_size){
@@ -167,11 +167,11 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
              * - have data in dict >= prefered chunk size
              * 
              */
-            while (!dict_free || (final & (bool)deco_data_len) || (deco_data_len >= chunk_size)){
-                ESP_LOGD(TAG, "CB - idx:%u, head:%u, dbgn:%u, dend:%u, ddatalen:%u, avin:%u, tin:%u, tout:%u, fin:%d", total_out, dictBuff, dict_begin, dict_offset, deco_data_len, avail_in, total_in, total_out, final && (err == MZ_STREAM_END));
+            while (!dict_free || (final && (bool)deco_data_len) || (deco_data_len >= chunk_size)){
+                ESP_LOGD(TAG, "CB - idx:%u, head:%u, dbgn:%u, dend:%u, ddatalen:%u, avin:%u, tin:%u, tout:%u, fin:%d", total_out, dictBuff, dict_begin, dict_offset, deco_data_len, avail_in, total_in, total_out, final);  //  && (err == MZ_STREAM_END)
 
                 // callback can consume only a portion of data from dict
-                size_t consumed = callback(total_out - deco_data_len, dictBuff + dict_begin, deco_data_len, final && (err == MZ_STREAM_END));
+                size_t consumed = callback(total_out - deco_data_len, dictBuff + dict_begin, deco_data_len, final && err == MZ_STREAM_END);
 
                 if (!consumed || consumed > deco_data_len)      // it's an error not to consume or consume too much of dict data
                     return MZ_ERRNO;
@@ -180,15 +180,17 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
                 if (consumed == deco_data_len){
                     dict_free = TINFL_LZ_DICT_SIZE;
                     dict_offset = 0;
+                    dict_begin = 0;
+                } else {
+                    dict_begin = (dict_begin+consumed) & (TINFL_LZ_DICT_SIZE - 1);     // offset deco data pointer in dict
                 }
 
-                dict_begin = (dict_begin+consumed) & (TINFL_LZ_DICT_SIZE - 1);     // offset deco data pointer in dict
                 deco_data_len -= consumed;
             }
         }
 
         // if we are done with this chunk of input, than quit
-        if (!avail_in)
+        if (!avail_in || err == MZ_STREAM_END)
             return err;
 
         esp_task_wdt_reset();           // feed the dog, flashing highly compressed data (like almost empty FS image) could trigger WDT
@@ -277,8 +279,13 @@ int FlashZ::flash_cb(size_t index, const uint8_t* data, size_t size, bool final)
     if (!size)
         return 0;
 
-    // try to align writes to flash sector size
-    size_t len = size <= SPI_FLASH_SEC_SIZE ? size : size - (size % SPI_FLASH_SEC_SIZE);
+    size_t len;
+    if (final){
+        len = size;
+    } else {
+        // try to align writes to flash sector size
+        len = size <= SPI_FLASH_SEC_SIZE ? size : size - (size % SPI_FLASH_SEC_SIZE);
+    }
     size_t _w = write((uint8_t*)data, len);     // this cast to (uint8_t*) is a very dirty hack, but Arduino's Updater lib is missing constness on data pointer
     if (_w != len){
         //ESP_LOGI(TAG, "magic: %02X%02X%02X%02X%02X%02X", data[0], data[1], data[2], data[3], data[4], data[5]);
@@ -286,9 +293,9 @@ int FlashZ::flash_cb(size_t index, const uint8_t* data, size_t size, bool final)
         return 0;                               // if written size is less than requested, consider it as a fatal error, since I can't determine proccessed delated size
     }
 
-    ESP_LOGI(TAG, "flashed %u bytes", len);
+    ESP_LOGI(TAG, "flashed %u bytes", _w);
 
-    return len;
+    return _w;
 }
 
 size_t FlashZ::writezStream(Stream &data, size_t len){

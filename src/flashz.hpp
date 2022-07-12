@@ -182,8 +182,8 @@ class FlashZ : public UpdateClass {
 
         /**
          * @brief Writes a buffer to the flash and increments the address
-         * Returns the amount of porcessed compressed bytes. Decompressed written size is usually larger
-         * returnes zero in case of any decompression error 
+         * Returns the amount of processed compressed bytes. Decompressed written size is usually larger
+         * returns zero in case of any decompression error 
          * 
          * @param data 
          * @param len 
@@ -215,4 +215,12 @@ class FlashZ : public UpdateClass {
          * @return false 
          */
         bool endz(bool evenIfRemaining = true);
+
+        /**
+         * @brief request stat data from the inflator
+         * return amount of input/inflated bytes processed so far
+         * 
+         * @param stat stat structure to update with data
+         */
+        void getstat(deco_stat_t &stat){ deco.getstat(stat); };
 };
