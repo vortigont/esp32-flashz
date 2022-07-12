@@ -1,14 +1,14 @@
 ESP32-FlashZ - an arduino library that provides zlib compressed OTA update feature for esp32
 ======
 
-__[EXAMPLES](/examples/README.md) |__ [![PlatformIO
+__[EXAMPLES](/examples/README.md) | [CHANGELOG](/examples/CHANGELOG.md) |__ [![PlatformIO
  CI](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml/badge.svg)](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml)
 
 
 Unlike [esp8266](https://github.com/esp8266/Arduino/pull/6820/commits/67ba90d3eaf01c5400d0b42cdce05ef9295d8c16), esp32's bootloader does not (yet) support compressed image updates. But esp32 has a miniz lib decompressor in ROM, so it can be used to decompress zlib packed stream on the fly during OTA and write decompressed data to flash. This could be done both for firmware and filesystem image.
 
-I wrote this lib just for fun to get the idea of miniz functions hidden in esp32 ROM. The code inspired by [esptool](https://github.com/espressif/esptool) than does the same with it's serial flasher stub. Now it is integrated into [EmbUI](https://github.com/vortigont/EmbUI) framework as OTA update handler.
-
+I wrote this lib just for fun to get the idea of miniz functions hidden in esp32 ROM. `FlashZ` lib is integrated into [EmbUI](https://github.com/vortigont/EmbUI) framework as OTA update handler.
+The code inspired by [esptool](https://github.com/espressif/esptool) that does the same with it's serial flasher stub.
 
 ### Features
  * low code overhead, deco algo is already present in ROM
@@ -49,26 +49,35 @@ The Lib consists of a low level `FlashZ` singleton that derives from a built-in 
 
 `FlashZ::abortz` or `FlashZ::endz` must be called to end the update and release dynamically allocated Inflator memory.
 
-To stich FlashZ with networking and OTA updates here is a `FlashZhttp` class. This is not a complete OTA updater solution but more of a refence implementation. It integrates [WebServer](https://github.com/espressif/arduino-esp32/tree/master/libraries/WebServer) or [AsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer) file upload feature with FLashZ low level methods. Also it can initiate streamed download via [http client](https://github.com/espressif/arduino-esp32/tree/master/libraries/ from a remote URL (only plain http).
-FlashZhttp methods includes some heuristic in attemp to autodetect file image format and type, so that it can handle both compressed and uncompressed images transparently. But for compressed file it can't autodetect between firmware and FS image, so it need some metadata to differetiate. Implemented via additional POST data.
-See [EXAMPLES](/examples/README.md for more further details.
+To stich FlashZ with networking and OTA updates here is a `FlashZhttp` class. This is not a complete OTA updater solution but more of a refence implementation. Any real-life projects could easily implement something similar with more features, bells and whistles.
+`FlashZhttp` class integrates [WebServer](https://github.com/espressif/arduino-esp32/tree/master/libraries/WebServer) or [AsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer) file upload feature with FLashZ low level methods. Also it can initiate streamed download via [http client](https://github.com/espressif/arduino-esp32/tree/master/libraries/) from a remote URL (only plain http).
+FlashZhttp methods includes some heuristic in attemp to autodetect file image format and type, so that it can handle both compressed and uncompressed images transparently. But for compressed file it can't autodetect between firmware and FS image, so it need some metadata to differetiate. This is implemented via additional POST data.
+
+By default `AsyncWebServer` support is not build into lib, do not want to intorduce dependency for external lib.
+To get `AsyncWebServer` support lib must be build with `FZ_WITH_ASYNCSRV` flag. This could be done via PlatformIO build_flags. `AsyncWebServer` and `ESP32 WebServer` support options are mutually exclusive due to some definitions clashing.
+See [EXAMPLES](/examples/README.md) projects for further details.
+
 
 ### Integration with PlatformIO
-It is pretty easy to integrate PlatformIO with HTTP OTA update via post build scripting. Python's zlib module could be used to compress firmware image after building and http-client module to upload a compressed image to the ESP32 board Over-the-Air. See a reference implementation in [post_flash.py](/examples/asyncserver-flash/post_flash.py) example. It relies on `FlashZhttp` class methods to process POST form data but could be adjusted easily. Additional platformio.ini variables are used to set remote address of a board. Uploading compressed firmware/FS is done automagicaly via simple `pio run -t upload`. (MCU must be connected to network and reachable).
+It is pretty easy to integrate PlatformIO with HTTP OTA update via post build scripting. Python's zlib module could be used to compress firmware image after building and http-client module to upload a compressed image to the ESP32 board Over-the-Air. See a reference implementation in [post_flash.py](/examples/asyncserver-flash/post_flash.py) example. It relies on `FlashZhttp` class methods to process POST form data but could be adjusted easily. Additional `platformio.ini` variables are used to set remote address of a board. Uploading compressed firmware/FS is done automagicaly via simple `pio run -t upload`. (MCU must be connected to network and reachable).
 
 ### Using CLI tools for updates
 I'm a linux user and prefer to use cli tools for automating tasks rather than web browser. So here are some oneliners for ESP32-FlashZ updating
 
  - compress and upload firmware image to ESP
+
 `pigz -9kzc .pio/build/esp32c3/firmware.bin | curl -v http://$ESPHOST/update -F file=@-`
 
  - compress and upload File System image to ESP
+
 `pigz -9kzc .pio/build/esp32-s2/littlefs.bin | curl -v http://$ESPHOST/update -F "img=fs" -F file=@-`
 
  - trigger esp32's firmware self-update from a remote host
+
 `curl http://$ESPHOST/update -F "img=fw" -F "url=http://$REMOTE/download/firmware.bin.zz"`
 
  - trigger esp32's FS self-update from a remote host
+
 `curl http://$ESPHOST/update -F "img=fs" -F "url=http://$REMOTE/download/littlefs.bin.zz"`
 
 
