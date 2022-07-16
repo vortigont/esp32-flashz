@@ -145,7 +145,9 @@ void FlashZhttp::file_upload(AsyncWebServerRequest *request, String filename, si
 
         // can rely on upload's size only if img is uncompressed
         // request->contentLength() return size of the whole post body, it is larger than uploaded file size
-        size_t size = (data[0] == ESP_IMAGE_HEADER_MAGIC) ? request->contentLength() : UPDATE_SIZE_UNKNOWN;
+        //size_t size = (data[0] == ESP_IMAGE_HEADER_MAGIC) ? request->contentLength() : UPDATE_SIZE_UNKNOWN;
+	size_t size = UPDATE_SIZE_UNKNOWN;
+
 
         ESP_LOGI(TAG, "Updating %s, input size:%u, mode_z:%u, magic: %02X", (type == U_FLASH)? "Firmware" : "Filesystem", request->contentLength(), mode_z, data[0]);
 
