@@ -65,4 +65,5 @@ to compress and upload image on-the-fly with [pigz](https://zlib.net/pigz/) tool
 ```
 pigz -9kzc .pio/build/flashz/firmware.bin | curl -v http://$ESPHOST/update -F "img=fw" -F file=@-
 pigz -9kzc .pio/build/flashz/littlefs.bin | curl -v http://$ESPHOST/update -F "img=fs" -F file=@-
+pigz -9kzc .pio/build/flashz/littlefs.bin | curl -v http://$ESPHOST/update -F "img=fs" -F 'file=@-;filename=filesystem'
 ```

@@ -61,7 +61,7 @@ See [EXAMPLES](/examples/README.md) projects for further details.
 
 
 ### Integration with PlatformIO
-It is pretty easy to integrate PlatformIO with HTTP OTA update via post build scripting. Python's zlib module could be used to compress firmware image after building and http-client module to upload a compressed image to  ESP32 board Over-the-Air. See a reference implementation in [post_flash.py](/examples/asyncserver-flash/post_flash.py) example. It relies on `FlashZhttp` class methods to process POST form data but could be adjusted easily. Additional `platformio.ini` variables are used to set remote address of a board. Uploading compressed firmware/FS is done automagicaly via simple `pio run -t upload`. (MCU must be connected to network and reachable).
+It is pretty easy to integrate PlatformIO with HTTP OTA update via post build scripting. Python's zlib module could be used to compress firmware image after building and http-client module to upload a compressed image to  ESP32 board Over-the-Air. See a reference implementation in [post_flashz.py](/examples/asyncserver-flash/post_flashz.py) example. It relies on `FlashZhttp` class methods to process POST form data but could be adjusted easily. Additional `platformio.ini` variables are used to set remote address of a board. Uploading compressed firmware/FS is done automagicaly via simple `pio run -t upload`. (MCU must be connected to network and reachable).
 
 ### Using CLI tools for updates
 I'm a linux user and prefer to use cli tools for automating tasks rather than web browser. So here are some oneliners for ESP32-FlashZ updating
