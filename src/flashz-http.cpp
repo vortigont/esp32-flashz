@@ -42,8 +42,6 @@
 // ESP32 log tag
 static const char *TAG __attribute__((unused)) = "FZ-HTTP";
 
-#define FZ_HTTP_CLIENT_DELAY    1000
-
 static const char PGotaform[]  = R"===(
 <!DOCTYPE html><html lang='en'>
 <head>
@@ -73,7 +71,13 @@ static const char PGotaform[]  = R"===(
 static const char PGimg[]  = "img";
 static const char PGurl[]  = "url";
 
-void FlashZhttp::fz_http_trigger(FlashZhttp *fz){ fz->http_get(); }
+void FlashZhttp::_fz_http_trigger(FlashZhttp *fz){
+    if (!fz->cb) return;
+    fz->_err = fz_http_err_t::inprogress;
+    fz->_err = fz->_http_get(fz->cb->url.c_str(), fz->cb->type);
+    delete fz->cb;
+    fz->cb = nullptr;
+}
 
 #ifdef FZ_WITH_ASYNCSRV
 void FlashZhttp::provide_ota_form(AsyncWebServer *srv, const char* url){
@@ -86,20 +90,8 @@ void FlashZhttp::handle_ota_form(AsyncWebServer *srv, const char* url){
         [this](AsyncWebServerRequest *request){
             // check if a post is for URL fw download form or post-file upload
             if(request->hasParam(PGurl, true)){
-                if (cb){ delete cb; }
-                cb = new callback_arg_t;
-                if (!cb) return;
-                cb->url = request->getParam(PGurl, true)->value();
-                cb->type = request->getParam(PGimg, true)->value() == "fs" ? U_SPIFFS : U_FLASH;
-
                 // postpone client-OTA, it can't be run in async call-back
-                if (t)
-                    t->detach();
-                else
-                    t = new Ticker;
-
-                if (!t) return;
-                t->attach_ms(FZ_HTTP_CLIENT_DELAY, fz_http_trigger, this);
+                fetch_async(request->getParam(PGurl, true)->value().c_str(), request->getParam(PGimg, true)->value() == "fs" ? U_SPIFFS : U_FLASH);
                 return request->send(200, PGmimetxt, "Attempting OTA from URL in background");
                 // dyn objects leaks mem but I do not care, 'cause mcu will reboot on success
             } else {
@@ -179,7 +171,7 @@ void FlashZhttp::file_upload(AsyncWebServerRequest *request, String filename, si
 
 #endif // #ifdef FZ_WITH_ASYNC
 
-fz_http_err_t FlashZhttp::http_get(const char* url, int imgtype){
+fz_http_err_t FlashZhttp::_http_get(const char* url, int imgtype){
     if (!url)
         return fz_http_err_t::bad_param;
 
@@ -237,26 +229,16 @@ fz_http_err_t FlashZhttp::http_get(const char* url, int imgtype){
     http.end();
 
     if (rst_timeout){
-        if (rst_timeout){
-            if (t)
-                t->detach();
-            else
-                t = new Ticker;
+        if (t)
+            t->detach();
+        else
+            t = new Ticker;
 
-            t->attach_ms(rst_timeout, [](){ ESP.restart(); });
-        }
+        t->attach_ms(rst_timeout, [](){ ESP.restart(); });
     }
 
     return fz_http_err_t::ok;
 }
-
-fz_http_err_t FlashZhttp::http_get(){
-    if (!cb) return fz_http_err_t::bad_param;
-    fz_http_err_t e = http_get(cb->url.c_str(), cb->type);
-    delete cb;
-    cb = nullptr;
-    return e;
-};
 
 #ifndef FZ_NO_WEBSRV
 void FlashZhttp::provide_ota_form(WebServer *server, const char* url){
@@ -268,20 +250,9 @@ void FlashZhttp::handle_ota_form(WebServer *server, const char* url){
     // handler for the /update form POST (once file upload finishes or http-client form)
     server->on(url, HTTP_POST, [server, this](){
         if (server->hasArg(PGurl)){
-            if (cb){ delete cb; }
-            cb = new callback_arg_t;
-            cb->url = server->arg(PGurl);
-            cb->type = server->arg(PGimg) == "fs" ? U_SPIFFS : U_FLASH;
-            
-            // postpone client-OTA, it can't be run in async call-back
-            if (t)
-                t->detach();
-            else
-                t = new Ticker;
-
-            t->attach_ms(FZ_HTTP_CLIENT_DELAY, fz_http_trigger, this);
+            // postpone client-OTA
+            fetch_async(server->arg(PGurl).c_str(), server->arg(PGimg) == "fs" ? U_SPIFFS : U_FLASH);
             return server->send(200, PGmimetxt, "Attempting OTA from URL in background");
-            // dyn objects leaks mem but I do not care, 'cause mcu will reboot on success
         } else {
             if (FlashZ::getInstance().hasError()) {
                 server->send(500, FPSTR(PGmimetxt), F("UPDATE FAILED"));
@@ -379,4 +350,18 @@ void FlashZhttp::file_upload(WebServer *server){
 unsigned FlashZhttp::autoreboot(unsigned t){
     t = rst_timeout;
     return t;
+}
+
+void FlashZhttp::fetch_async(const char* url, int imgtype, int delay){
+    if (!cb){ cb = new callback_arg_t; }
+    cb->url = url;
+    cb->type = imgtype;
+
+    if (t)
+        t->detach();
+    else
+        t = new Ticker;
+
+    t->attach_ms(delay, _fz_http_trigger, this);
+    _err = fz_http_err_t::pending;
 }

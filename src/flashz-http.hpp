@@ -38,6 +38,7 @@
 #include <Ticker.h>
 
 #define FZ_REBOOT_TIMEOUT  5000
+#define FZ_HTTP_CLIENT_DELAY    1000
 
 static const char PGmimehtml[] = "text/html; charset=utf-8";
 static const char PGmimetxt[]  = "text/plain";
@@ -49,7 +50,10 @@ enum class fz_http_err_t:int {
     bad_size = -3,
     httpcode_err = -2,
     bad_param = -1,
-    ok = 0
+    ok = 0,
+    idle = 1,
+    pending = 2,
+    inprogress = 3
 };
 
 
@@ -67,15 +71,50 @@ class FlashZhttp {
     };
 
     unsigned rst_timeout = FZ_REBOOT_TIMEOUT;
+    fz_http_err_t _err = fz_http_err_t::idle;
     callback_arg_t *cb;
 
     Ticker *t;
 
-    static void fz_http_trigger(FlashZhttp *fz);
+    // callback trigger for Ticker
+    static void _fz_http_trigger(FlashZhttp *fz);
+
+    /**
+     * @brief fetch (possibly compressed) image file via http and flash
+     * compressed image format is autodetected
+     * 
+     * @param url - source URL for firmware file (https is not supported)
+     * @param imgtype - image file type U_FLASH (0 - default) or U_SPIFFS
+     * @return fz_http_err_t - returns error code
+     */
+    fz_http_err_t _http_get(const char* url, int imgtype = 0);
+
 
 public:
+    /**
+     * @brief set autoreboot timeout after successful update
+     * 
+     * @param t - timeout, ms
+     * @return unsigned timeout, ms
+     */
     unsigned autoreboot(unsigned t);
+
+    /**
+     * @brief get set autoreboot timeout after successful update
+     * 
+     * @return unsigned - timeout, ms. Autoreboot disabled if set to zero
+     */
     unsigned autoreboot(){ return rst_timeout; };
+
+    /**
+     * @brief fetch and flash firmware from remote URL
+     * schedule fw update from remote URL (http)
+     * 
+     * @param url - remote URL to fetch fw file (http only)
+     * @param imgtype - image type U_FLASH (0 - default) or U_SPIFFS
+     * @param delay - schedule delay in ms
+     */
+    void fetch_async(const char* url, int imgtype = 0, int delay = FZ_HTTP_CLIENT_DELAY);
 
 #ifdef FZ_WITH_ASYNCSRV
     /**
@@ -148,16 +187,5 @@ public:
      */
     void file_upload(WebServer *server);
 #endif // #ifndef FZ_NO_WEBSRV
-
-    /**
-     * @brief fetch (possibly compressed) image file via http and flash
-     * compressed image format is autodetected
-     * 
-     * @param url - source URL for firmware file (https is not supported)
-     * @param imgtype - image file type U_FLASH (0 - default) or U_SPIFFS
-     * @return fz_http_err_t - returns error code
-     */
-    fz_http_err_t http_get(const char* url, int imgtype = 0);
-    fz_http_err_t http_get();
 
 };
