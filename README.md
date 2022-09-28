@@ -39,6 +39,20 @@ Check [examples](/examples) to get more idea on how to intergate this lib into p
 |ESP32-c3     | :heavy_check_mark: | :heavy_check_mark: |
 
 
+### Comparison
+some basic tests
+
+| OTA update                           | Origin | zlib |
+|-            		               |  -     | -    |
+| esp32, fw, ~1MiB                     | 9.8 s  |  10.1 s |
+| esp32, fs, ~1.5MiB, 90% sparse       | 9 s    |  6 s   |
+| esp32-c3, fw, ~1MiB                  | 9.2 s  |  9.1 s |
+| esp32-c3, fs, ~1.5MiB, 90% sparse    | 4.1 s  |  2.5 s |
+| esp32-s2, fw, ~1MiB                  | 7.5 s  |  7.5 s |
+| esp32-s2, fs, ~1.5MiB, 90% sparse    | 4.7 s  |  1.8 s |
+
+
+
 ### Using FlashZ lib
 FlashZ Lib consists of a low level `FlashZ` singleton that derives from a built-in Arduino's [UpdateClass](https://github.com/espressif/arduino-esp32/tree/master/libraries/Update) class and provides additional methods to handle zlib compressed data. It tries to maintain same API as `Update`.
 
