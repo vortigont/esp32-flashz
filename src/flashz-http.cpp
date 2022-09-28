@@ -207,16 +207,18 @@ fz_http_err_t FlashZhttp::_http_get(const char* url, int imgtype){
     ESP_LOGI(TAG, "Updating %s, input size:%u, mode_z:%u, magic: %02X", (imgtype == U_FLASH)? "FW" : "FS", len, mode_z, stream->peek());
 
     if (!(mode_z ? FlashZ::getInstance().beginz(fwsize, imgtype) : FlashZ::getInstance().begin(fwsize, imgtype))){
+        FlashZ::getInstance().abortz();
         ESP_LOGW(TAG, "Failed to start Update");
         return fz_http_err_t::bad_start;
     }
 
     size_t wrt = mode_z ? FlashZ::getInstance().writezStream(*stream, len) : FlashZ::getInstance().writeStream(*stream);
+    http.end();
+    stream = nullptr;
 
     if (wrt != len){
         FlashZ::getInstance().abortz();
         ESP_LOGE(TAG, "UPD failed, wrt:%d of %d\n", wrt, len);
-        http.end();
         return fz_http_err_t::write_err;
     } else {
         if(FlashZ::getInstance().endz()){
@@ -225,8 +227,6 @@ fz_http_err_t FlashZhttp::_http_get(const char* url, int imgtype){
             ESP_LOGW(TAG, "Update failed to complete");
         }
     }
-
-    http.end();
 
     if (rst_timeout){
         if (t)
