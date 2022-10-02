@@ -41,7 +41,7 @@ static const char *TAG __attribute__((unused)) = "FLASHZ";
 
 #define INFLATOR_STREAM_BUFF_SIZE   128
 #define INFLATOR_STREAM_DELAY_MS    5
-#define INFLATOR_STREAM_DELAY_CTR   50
+#define INFLATOR_STREAM_TIMEOUT_MS  10000
 
 
 // Inflator class implementation
@@ -141,12 +141,12 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
         int err = inflate(final);                                   // inflate as much in-data as possible
 
         if (err < 0){
-            ESP_LOGW(TAG, "inflate failure - MZ_ERR: %d, inflate status: %d", err, decomp_status);
+            log_w("inflate failure - MZ_ERR: %d, inflate status: %d", err, decomp_status);
             return err;                                             // exit on any error
         }
 
         size_t deco_data_len = (dict_offset - dict_begin) & (TINFL_LZ_DICT_SIZE - 1);
-        //ESP_LOGD(TAG, "+inflate chunk - mz_err:%d, ddl:%d, dfree:%u, tin:%u, tout:%u", err, deco_data_len, dict_free, total_in, total_out);
+        //log_d("+inflate chunk - mz_err:%d, ddl:%d, dfree:%u, tin:%u, tout:%u", err, deco_data_len, dict_free, total_in, total_out);
 
         if (!dict_offset && !dict_begin && total_out > _to)
             deco_data_len = TINFL_LZ_DICT_SIZE;     // jackpot - a full dict worth of data
@@ -158,17 +158,17 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
          * - it's a final input chunk
          */
         if (!dict_free || deco_data_len >= chunk_size || final){
-            //ESP_LOGD(TAG, "dict stat: dfree:%u, ddl:%u, end:%u, tin:%d, tout:%d", dict_free, deco_data_len, final, total_in, total_out);
+            //log_d("dict stat: dfree:%u, ddl:%u, end:%u, tin:%d, tout:%d", dict_free, deco_data_len, final, total_in, total_out);
 
             /**
              * iterate the callback while:
              * - no space in dict
              * - have data in dict and it's a final chunk
              * - have data in dict >= prefered chunk size
-             * 
+             *
              */
             while (!dict_free || (final && (bool)deco_data_len) || (deco_data_len >= chunk_size)){
-                ESP_LOGD(TAG, "CB - idx:%u, head:%u, dbgn:%u, dend:%u, ddatalen:%u, avin:%u, tin:%u, tout:%u, fin:%d", total_out, dictBuff, dict_begin, dict_offset, deco_data_len, avail_in, total_in, total_out, final);  //  && (err == MZ_STREAM_END)
+                log_d("CB - idx:%u, head:%u, dbgn:%u, dend:%u, ddatalen:%u, avin:%u, tin:%u, tout:%u, fin:%d", total_out, dictBuff, dict_begin, dict_offset, deco_data_len, avail_in, total_in, total_out, final);  //  && (err == MZ_STREAM_END)
 
                 // callback can consume only a portion of data from dict
                 size_t consumed = callback(total_out - deco_data_len, dictBuff + dict_begin, deco_data_len, final && err == MZ_STREAM_END);
@@ -203,17 +203,19 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
 int Inflator::inflate_stream_to_cb(Stream &data, int size, inflate_cb_t callback, size_t chunk_size){
     uint8_t buff[INFLATOR_STREAM_BUFF_SIZE];    // stream buffer
 
-    int ctr = INFLATOR_STREAM_DELAY_CTR;        // stream wait/retry counter
     do {
-        size_t available = data.available();
-        if (!available && size){
-            delay(INFLATOR_STREAM_DELAY_MS);
-            if (--ctr)
-                continue;
-            else
-                return MZ_STREAM_ERROR;
+        // check stream readiness
+        uint32_t now = millis();
+        uint32_t timeout = now+INFLATOR_STREAM_TIMEOUT_MS;
+        while(!data.available() ) {
+          if( millis() > timeout ) {
+            // timeout on stream, giving up
+            return MZ_STREAM_ERROR;
+          }
+          vTaskDelay(1); // let the stream breathe
         }
-        ctr = INFLATOR_STREAM_DELAY_CTR;
+
+        size_t available = data.available();
 
         // fill the buff from a stream
         int len = data.readBytes(buff, (available > sizeof(buff)) ? sizeof(buff) : available);
@@ -221,14 +223,14 @@ int Inflator::inflate_stream_to_cb(Stream &data, int size, inflate_cb_t callback
         // inflate buff
         int err = inflate_block_to_cb(buff, len, callback, (len == size), chunk_size);
         if (err < 0){
-            //ESP_LOGI(TAG, "compressed buff: %02X%02X%02X%02X%02X%02X", buff[0], buff[1], buff[2], buff[3], buff[4], buff[5]);
+            //log_i("compressed buff: %02X%02X%02X%02X%02X%02X", buff[0], buff[1], buff[2], buff[3], buff[4], buff[5]);
             return err;
         }
 
         size -= len;
     } while(size > 0);
 
-    //ESP_LOGW(TAG, "inflate stream %d bytes left", size);
+    //log_w("inflate stream %d bytes left", size);
     return size ? MZ_STREAM_ERROR : MZ_STREAM_END;
 }
 
@@ -288,12 +290,12 @@ int FlashZ::flash_cb(size_t index, const uint8_t* data, size_t size, bool final)
     }
     size_t _w = write((uint8_t*)data, len);     // this cast to (uint8_t*) is a very dirty hack, but Arduino's Updater lib is missing constness on data pointer
     if (_w != len){
-        //ESP_LOGI(TAG, "magic: %02X%02X%02X%02X%02X%02X", data[0], data[1], data[2], data[3], data[4], data[5]);
+        //log_i("magic: %02X%02X%02X%02X%02X%02X", data[0], data[1], data[2], data[3], data[4], data[5]);
         ESP_LOGE(TAG, "ERROR, flashed %d of %d bytes chunk, err: %s!", _w, len, errorString());
         return 0;                               // if written size is less than requested, consider it as a fatal error, since I can't determine proccessed delated size
     }
 
-    ESP_LOGI(TAG, "flashed %u bytes", _w);
+    log_i("flashed %u bytes", _w);
 
     return _w;
 }
@@ -304,7 +306,7 @@ size_t FlashZ::writezStream(Stream &data, size_t len){
 
     int err = deco.inflate_stream_to_cb(data, len, [this](size_t i, const uint8_t* d, size_t s, bool f) -> int { return flash_cb(i, d, s, f); });
 
-    ESP_LOGI(TAG, "inflate stream err status: %d", err);
+    log_i("inflate stream err status: %d", err);
 
     deco_stat_t s;
     deco.getstat(s);
