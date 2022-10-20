@@ -2,7 +2,7 @@ ESP32-FlashZ
 an arduino library that provides zlib compressed OTA update feature for esp32
 ======
 
-__[EXAMPLES](/examples/README.md) | [CHANGELOG](/examples/CHANGELOG.md) |__ [![PlatformIO
+__[EXAMPLES](/examples/README.md) | [CHANGELOG](/CHANGELOG.md) |__ [![PlatformIO
  CI](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml/badge.svg)](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml)
 
 
