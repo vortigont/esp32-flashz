@@ -304,7 +304,7 @@ size_t FlashZ::writezStream(Stream &data, size_t len){
     if (!mode_z)
         return writeStream(data);
 
-    int err = deco.inflate_stream_to_cb(data, len, [this](size_t i, const uint8_t* d, size_t s, bool f) -> int { return flash_cb(i, d, s, f); });
+    int err __attribute__((unused)) = deco.inflate_stream_to_cb(data, len, [this](size_t i, const uint8_t* d, size_t s, bool f) -> int { return flash_cb(i, d, s, f); });
 
     ESP_LOGI(TAG, "inflate stream err status: %d", err);
 
