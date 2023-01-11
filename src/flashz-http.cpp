@@ -93,18 +93,15 @@ void FlashZhttp::handle_ota_form(AsyncWebServer *srv, const char* url){
                 // postpone client-OTA, it can't be run in async call-back
                 fetch_async(request->getParam(PGurl, true)->value().c_str(), request->getParam(PGimg, true)->value() == "fs" ? U_SPIFFS : U_FLASH);
                 return request->send(200, PGmimetxt, "Attempting OTA from URL in background");
-                // dyn objects leaks mem but I do not care, 'cause mcu will reboot on success
             } else {
                 if (FlashZ::getInstance().hasError()) {
                     request->send(503, PGmimetxt, "Update FAILED");
                 } else {
                     if (rst_timeout){
-                        if (t)
-                            t->detach();
-                        else
+                        if (!t)
                             t = new Ticker;
 
-                        t->attach_ms(rst_timeout, [](){ ESP.restart(); });
+                        t->once_ms(rst_timeout, [](){ ESP.restart(); });
                     }
                     request->send(200, PGmimetxt, "OTA complete, autoreboot in 5 sec...");
                 }
@@ -229,12 +226,10 @@ fz_http_err_t FlashZhttp::_http_get(const char* url, int imgtype){
     }
 
     if (rst_timeout){
-        if (t)
-            t->detach();
-        else
+        if (!t)
             t = new Ticker;
 
-        t->attach_ms(rst_timeout, [](){ ESP.restart(); });
+        t->once_ms(rst_timeout, [](){ ESP.restart(); });
     }
 
     return fz_http_err_t::ok;
@@ -258,12 +253,10 @@ void FlashZhttp::handle_ota_form(WebServer *server, const char* url){
                 server->send(500, FPSTR(PGmimetxt), F("UPDATE FAILED"));
             } else {
                 if (rst_timeout){
-                    if (t)
-                        t->detach();
-                    else
+                    if (!t)
                         t = new Ticker;
 
-                    t->attach_ms(rst_timeout, [](){ ESP.restart(); });
+                    t->once_ms(rst_timeout, [](){ ESP.restart(); });
                 }
 
                 server->client().setNoDelay(true);
@@ -353,15 +346,8 @@ unsigned FlashZhttp::autoreboot(unsigned t){
 }
 
 void FlashZhttp::fetch_async(const char* url, int imgtype, int delay){
-    if (!cb){ cb = new callback_arg_t; }
-    cb->url = url;
-    cb->type = imgtype;
-
-    if (t)
-        t->detach();
-    else
-        t = new Ticker;
-
-    t->attach_ms(delay, _fz_http_trigger, this);
+    if (!cb){ cb = new callback_arg_t(imgtype, url); }
+    if (!t) t = new Ticker;
+    t->once_ms(delay, FlashZhttp::_fz_http_trigger, this);
     _err = fz_http_err_t::pending;
 }

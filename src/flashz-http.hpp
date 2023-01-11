@@ -68,13 +68,15 @@ class FlashZhttp {
     struct callback_arg_t {
         int type;
         String url;
+        callback_arg_t(){};
+        callback_arg_t( int t, const char* url) : type(t), url(url) {};
     };
 
     unsigned rst_timeout = FZ_REBOOT_TIMEOUT;
     fz_http_err_t _err = fz_http_err_t::idle;
-    callback_arg_t *cb;
+    callback_arg_t *cb = nullptr;
 
-    Ticker *t;
+    Ticker *t = nullptr;
 
     // callback trigger for Ticker
     static void _fz_http_trigger(FlashZhttp *fz);
@@ -91,6 +93,8 @@ class FlashZhttp {
 
 
 public:
+    ~FlashZhttp(){ delete t; delete cb; t = nullptr; cb = nullptr; }
+
     /**
      * @brief set autoreboot timeout after successful update
      * 
