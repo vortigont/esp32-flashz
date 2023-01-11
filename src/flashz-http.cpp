@@ -346,8 +346,13 @@ unsigned FlashZhttp::autoreboot(unsigned t){
 }
 
 void FlashZhttp::fetch_async(const char* url, int imgtype, int delay){
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+#warning "esp32-c3 does not support OTA via http-client"
+#else
     if (!cb){ cb = new callback_arg_t(imgtype, url); }
     if (!t) t = new Ticker;
+    // have no idea why, but C3 bootloops here, needs investigation
     t->once_ms(delay, FlashZhttp::_fz_http_trigger, this);
     _err = fz_http_err_t::pending;
+#endif
 }
