@@ -35,6 +35,7 @@
 #else
 #include <WebServer.h>
 #endif  // #ifdef FZ_WITH_ASYNCSRV
+
 #include <Ticker.h>
 
 #define FZ_REBOOT_TIMEOUT  5000
@@ -65,18 +66,18 @@ enum class fz_http_err_t:int {
  * 
  */
 class FlashZhttp {
+    unsigned rst_timeout = FZ_REBOOT_TIMEOUT;
+    Ticker *t = nullptr;
+
+#ifndef  FZ_NOHTTPCLIENT
     struct callback_arg_t {
         int type;
         String url;
         callback_arg_t(){};
         callback_arg_t( int t, const char* url) : type(t), url(url) {};
     };
-
-    unsigned rst_timeout = FZ_REBOOT_TIMEOUT;
     fz_http_err_t _err = fz_http_err_t::idle;
     callback_arg_t *cb = nullptr;
-
-    Ticker *t = nullptr;
 
     // callback trigger for Ticker
     static void _fz_http_trigger(FlashZhttp *fz);
@@ -90,10 +91,16 @@ class FlashZhttp {
      * @return fz_http_err_t - returns error code
      */
     fz_http_err_t _http_get(const char* url, int imgtype = 0);
-
+#endif
 
 public:
-    ~FlashZhttp(){ delete t; delete cb; t = nullptr; cb = nullptr; }
+    ~FlashZhttp(){
+        delete t; t = nullptr;
+#ifndef  FZ_NOHTTPCLIENT
+        delete cb;
+        cb = nullptr;
+#endif
+    }
 
     /**
      * @brief set autoreboot timeout after successful update
@@ -110,6 +117,7 @@ public:
      */
     unsigned autoreboot(){ return rst_timeout; };
 
+#ifndef  FZ_NOHTTPCLIENT
     /**
      * @brief fetch and flash firmware from remote URL
      * schedule fw update from remote URL (http)
@@ -119,6 +127,7 @@ public:
      * @param delay - schedule delay in ms
      */
     void fetch_async(const char* url, int imgtype = 0, int delay = FZ_HTTP_CLIENT_DELAY);
+#endif
 
 #ifdef FZ_WITH_ASYNCSRV
     /**

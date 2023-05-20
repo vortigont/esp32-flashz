@@ -30,8 +30,14 @@
 #include "flashz-http.hpp"
 #include "flashz.hpp"
 
-#include <HTTPClient.h>
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+#define FZ_NOHTTPCLIENT
+#warning "esp32-c3 does not support OTA via http-client"
+#endif
 
+#ifndef  FZ_NOHTTPCLIENT
+#include <HTTPClient.h>
+#endif
 
 #ifdef ARDUINO
 #include "esp32-hal-log.h"
@@ -71,6 +77,7 @@ static const char PGotaform[]  = R"===(
 static const char PGimg[]  = "img";
 static const char PGurl[]  = "url";
 
+#ifndef  FZ_NOHTTPCLIENT
 void FlashZhttp::_fz_http_trigger(FlashZhttp *fz){
     if (!fz->cb) return;
     fz->_err = fz_http_err_t::inprogress;
@@ -78,6 +85,7 @@ void FlashZhttp::_fz_http_trigger(FlashZhttp *fz){
     delete fz->cb;
     fz->cb = nullptr;
 }
+#endif
 
 #ifdef FZ_WITH_ASYNCSRV
 void FlashZhttp::provide_ota_form(AsyncWebServer *srv, const char* url){
@@ -90,9 +98,13 @@ void FlashZhttp::handle_ota_form(AsyncWebServer *srv, const char* url){
         [this](AsyncWebServerRequest *request){
             // check if a post is for URL fw download form or post-file upload
             if(request->hasParam(PGurl, true)){
+#ifdef FZ_NOHTTPCLIENT
+                return request->send(500, PGmimetxt, "No HTTP Client support");
+#else
                 // postpone client-OTA, it can't be run in async call-back
                 fetch_async(request->getParam(PGurl, true)->value().c_str(), request->getParam(PGimg, true)->value() == "fs" ? U_SPIFFS : U_FLASH);
                 return request->send(200, PGmimetxt, "Attempting OTA from URL in background");
+#endif  // FZ_NOHTTPCLIENT
             } else {
                 if (FlashZ::getInstance().hasError()) {
                     request->send(503, PGmimetxt, "Update FAILED");
@@ -168,6 +180,7 @@ void FlashZhttp::file_upload(AsyncWebServerRequest *request, String filename, si
 
 #endif // #ifdef FZ_WITH_ASYNC
 
+#ifndef  FZ_NOHTTPCLIENT
 fz_http_err_t FlashZhttp::_http_get(const char* url, int imgtype){
     if (!url)
         return fz_http_err_t::bad_param;
@@ -234,6 +247,7 @@ fz_http_err_t FlashZhttp::_http_get(const char* url, int imgtype){
 
     return fz_http_err_t::ok;
 }
+#endif  //FZ_NOHTTPCLIENT
 
 #ifndef FZ_NO_WEBSRV
 void FlashZhttp::provide_ota_form(WebServer *server, const char* url){
@@ -245,12 +259,16 @@ void FlashZhttp::handle_ota_form(WebServer *server, const char* url){
     // handler for the /update form POST (once file upload finishes or http-client form)
     server->on(url, HTTP_POST, [server, this](){
         if (server->hasArg(PGurl)){
+#ifdef FZ_NOHTTPCLIENT
+            return server->send(500, PGmimetxt, "No HTTP Client support");
+#else
             // postpone client-OTA
             fetch_async(server->arg(PGurl).c_str(), server->arg(PGimg) == "fs" ? U_SPIFFS : U_FLASH);
             return server->send(200, PGmimetxt, "Attempting OTA from URL in background");
+#endif  // FZ_NOHTTPCLIENT
         } else {
             if (FlashZ::getInstance().hasError()) {
-                server->send(500, FPSTR(PGmimetxt), F("UPDATE FAILED"));
+                server->send(500, PGmimetxt, "UPDATE FAILED");
             } else {
                 if (rst_timeout){
                     if (!t)
@@ -260,7 +278,7 @@ void FlashZhttp::handle_ota_form(WebServer *server, const char* url){
                 }
 
                 server->client().setNoDelay(true);
-                server->send(200, FPSTR(PGmimetxt), F("OTA complete, autoreboot in 5 sec..."));
+                server->send(200, PGmimetxt, F("OTA complete, autoreboot in 5 sec..."));
                 server->client().stop();
             }
         }
@@ -345,14 +363,12 @@ unsigned FlashZhttp::autoreboot(unsigned t){
     return t;
 }
 
+#ifndef FZ_NOHTTPCLIENT
 void FlashZhttp::fetch_async(const char* url, int imgtype, int delay){
-#ifdef CONFIG_IDF_TARGET_ESP32C3
-#warning "esp32-c3 does not support OTA via http-client"
-#else
     if (!cb){ cb = new callback_arg_t(imgtype, url); }
     if (!t) t = new Ticker;
     // have no idea why, but C3 bootloops here, needs investigation
     t->once_ms(delay, FlashZhttp::_fz_http_trigger, this);
     _err = fz_http_err_t::pending;
-#endif
 }
+#endif  //FZ_NOHTTPCLIENT
