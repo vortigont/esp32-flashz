@@ -1,5 +1,10 @@
 # Change Log
 
+## v 1.1.2 (2023-05-20)
+ + add `FZ_NOHTTPCLIENT` build-time flag to exclude HTTP Client support for the sake of reduced binary size
+ * more safety for dynamic objects
+ - disable "HTTP Client" feature for esp32-c3 (need triage)
+
 ## v 1.1.1 (2022-10-02)
  * Changed read counter to read timeout (by @tobozo)
  * deallocate inflator's mem on update begin failure
