@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firmware and Spiffs Uploader</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+</head>
+<body>
+
+<h2>Upload Firmware and Spiffs Files</h2>
+
+<label for="firmwareFile">Firmware File (only .bin and .zz files are allowed)</label>
+<input type="file" id="firmwareFile" name="firmwareFile" accept=".bin,.zz" /><br/>
+
+<label for="spiffsFile">Spiffs File (only .bin files are allowed)</label>
+<input type="file" id="spiffsFile" name="spiffsFile" accept=".bin" /><br/>
+
+
+<button id="uploadBtn">Upload</button>
+
+<div id="customAlert" style="display:none;">
+  <p id="alertText"></p>
+</div>
+
+<p id="message_firmware"></p>
+<p id="message_spiffs"></p>
+
+<script>
+function sendFile(file, url) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var data = new Uint8Array(e.target.result);
+      // Compress only if the file is firmware and not already compressed
+      if (url.includes("firmware") && !file.name.endsWith('.zz')) {
+        data = pako.deflate(data); // Use deflate for zlib compression
+      }
+      var blob = new Blob([data], {type: 'application/zlib'}); 
+      var formData = new FormData();
+      formData.append('file', blob, file.name.endsWith('.zz') ? file.name : file.name + '.zz'); // Change file extension to .zz
+      formData.append("img", url.includes("spiffs") ? "fs" : "firmware");
+  
+      fetch("/update", { 
+        method: "POST",
+        body: formData
+      })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Network error when sending the file.");
+        }
+        return response.text();
+      })
+      .then((data) => {
+        console.log(data);
+        document.getElementById("message_" + (url.includes("spiffs") ? "spiffs" : "firmware")).innerText = data;
+      })
+      .catch((error) => {
+        console.error("Error when sending the file:", error);
+        document.getElementById("message_" + (url.includes("spiffs") ? "spiffs" : "firmware")).innerText =
+          "Error when sending the file "+ (url.includes("spiffs") ? "spiffs" : "firmware");
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  
+  
+  document.getElementById("uploadBtn").addEventListener("click", function () {
+    var firmwareFile = document.getElementById('firmwareFile').files[0];
+    var spiffsFile = document.getElementById('spiffsFile').files[0];
+  
+    if (spiffsFile) {
+      if (!spiffsFile.name.endsWith('.bin')) {
+        document.getElementById("alertText").innerText =
+        "Only .bin files are allowed for SPIFFS";
+        document.getElementById("customAlert").style.display = "block";
+        return;
+      }
+      sendFile(spiffsFile, "/update-spiffs"); // Send SPIFFS file
+    }
+  
+    if (firmwareFile) {
+      if (!firmwareFile.name.endsWith('.bin') && !firmwareFile.name.endsWith('.zz')) {
+        document.getElementById("alertText").innerText =
+        "Only .bin or .zz files are allowed for firmware";
+        document.getElementById("customAlert").style.display = "block";
+        return;
+      }
+      sendFile(firmwareFile, "/update-firmware"); // Send firmware file
+    }
+  
+    if (!spiffsFile && !firmwareFile) {
+      document.getElementById("message_firmware").style.display = "block";
+      document.getElementById("message_firmware").innerText = "No firmware file";
+      document.getElementById("message_spiffs").style.display = "block";
+      document.getElementById("message_spiffs").innerText = "No spiffs file";
+    }
+  });
+</script>
+
+</body>
+</html>
