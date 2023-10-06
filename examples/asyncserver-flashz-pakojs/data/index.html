@@ -1,18 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Firmware and Spiffs Uploader</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <title>ESP32 Firmware and Spiffs Uploader</title>
+    <script src="pako.min.js"></script>
 </head>
 <body>
 
-<h2>Upload Firmware and Spiffs Files</h2>
+<h2>Upload Firmware and LittleFS image Files</h2>
+
+<p>This demo form could upload firmware and FS images to esp32 boards using on-the-fly gzip compression via <a href="https://github.com/nodeca/pako">pako</a>> js lib.</p>
+<br><br>
 
 <label for="firmwareFile">Firmware File (only .bin and .zz files are allowed)</label>
 <input type="file" id="firmwareFile" name="firmwareFile" accept=".bin,.zz" /><br/>
 
-<label for="spiffsFile">Spiffs File (only .bin files are allowed)</label>
-<input type="file" id="spiffsFile" name="spiffsFile" accept=".bin" /><br/>
+<label for="spiffsFile">LittleFS image File (only .bin and .zz files are allowed)</label>
+<input type="file" id="spiffsFile" name="spiffsFile" accept=".bin,.zz" /><br/>
 
 
 <button id="uploadBtn">Upload</button>
@@ -29,8 +32,8 @@ function sendFile(file, url) {
     var reader = new FileReader();
     reader.onload = function(e) {
       var data = new Uint8Array(e.target.result);
-      // Compress only if the file is firmware and not already compressed
-      if (url.includes("firmware") && !file.name.endsWith('.zz')) {
+      // Compress only if file is not already compressed
+      if (!file.name.endsWith('.zz')) {
         data = pako.deflate(data); // Use deflate for zlib compression
       }
       var blob = new Blob([data], {type: 'application/zlib'}); 

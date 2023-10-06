@@ -146,8 +146,8 @@ public:
  */
 class FlashZ : public UpdateClass {
 
-    FlashZ(){};     // hidden c-tor
-    ~FlashZ(){};    // hidden d-tor
+    FlashZ() = default; // hidden c-tor
+    ~FlashZ(){};    	// hidden d-tor
 
     //deco_stat_t stat;
     bool mode_z = false;        // need to keep mode state for async writez() calls

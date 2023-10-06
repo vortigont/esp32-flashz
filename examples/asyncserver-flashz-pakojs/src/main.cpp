@@ -57,8 +57,8 @@
 #define BAUD_RATE       115200  // serial port baud rate (for debug)
 
 // Set your WiFi AP credentials here
-const char* ssid = "Livebox-1090";
-const char* password = "nUptYUSLjA3cWKoGHw";
+const char* ssid = "MySSID";
+const char* password = "MyPass";
 const char* ota_url = "/update";        // OTA form URL
 
 AsyncWebServer server(80);              // AsyncWebServer instance

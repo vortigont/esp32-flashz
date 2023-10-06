@@ -18,6 +18,7 @@ The code inspired by [esptool](https://github.com/espressif/esptool) that does t
  * compatible with [AsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer), autodetect compressed/non-compressed images
  * stream decompression, i.e. via [http client](https://github.com/espressif/arduino-esp32/tree/master/libraries/HTTPClient) (fetch and flash compressed image from remote URL)
  * PlatformIO integration via [post_flash.py](/examples/asyncserver-flash/post_flash.py) script that automates on-the-fly compression and OTA upload for your project
+ * on-the-fly compressed upload example via [pako](https://github.com/nodeca/pako) js lib (tnx to @playmiel for contribution)
 
 ### Requirements
  * 32k of heap memory during decompression for dict data
@@ -26,6 +27,7 @@ The code inspired by [esptool](https://github.com/espressif/esptool) that does t
     - use [pigz](https://zlib.net/pigz/) tool with `-z` flag
     - use python's zlib module (check [post_flash.py](/examples/asyncserver-flash/post_flash.py) script for Platformio)
     - use perl's Compress::Zlib module
+    - use [pako](https://github.com/nodeca/pako) js lib
 
 
 Check [examples](/examples) to get more idea on how to intergate this lib into platformio projects
@@ -35,7 +37,7 @@ Check [examples](/examples) to get more idea on how to intergate this lib into p
 |-------------|--------------------|--------------------|
 |ESP32        | :heavy_check_mark: | :heavy_check_mark: |
 |ESP32-S2     | :heavy_check_mark: | :heavy_check_mark: |
-|ESP32-S3     | not tested         | not tested         |
+|ESP32-S3     | :heavy_check_mark: | :heavy_check_mark: |
 |ESP32-c3     | :heavy_check_mark: | :heavy_check_mark: |
 
 
@@ -76,7 +78,7 @@ See [EXAMPLES](/examples/README.md) projects for further details.
 
 By default `FlashZhttp` class within the lib includes support for HTTP Client to be able to download and flash an image from a remote URL. It uses Arduino's `HTTPClient.h` lib for that, which ALWAYS includes SSL support, even if client code does not meant to be using it. SSL support makes a huge impact on resulting firmware image size, it grows in about 100-120k. If you do not need HTTP Client support for the sake of reducing resulting image size you can define `FZ_NOHTTPCLIENT` build flag to completely disable HTTP Client and allow linker exclude SSL-related code from the resulting firmware image. This is here untill I find a better way to workaround it, maybe a flag to exclude FlashZhttp completely?
 
-Also you **should** always specify `NO_GLOBAL_UPDATE` build flag for your project to prevent Arduino's UpdateClass creating it's intance by default. FlashZ uses it's own instance of a derived class and default one just wastes your memory (about 180 bytes). See [arduino-esp32/releases#8500](https://github.com/espressif/arduino-esp32/pull/8500 )
+Also you **should** always specify `NO_GLOBAL_UPDATE` build flag for your project to prevent Arduino's UpdateClass creating it's instance by default. FlashZ uses it's own instance of a derived class and default one just wastes your memory (about 180 bytes). See [arduino-esp32/releases#8500](https://github.com/espressif/arduino-esp32/pull/8500 )
 
 ### Integration with PlatformIO
 It is pretty easy to integrate PlatformIO with HTTP OTA update via post build scripting. Python's zlib module could be used to compress firmware image after building and http-client module to upload a compressed image to  ESP32 board Over-the-Air. See a reference implementation in [post_flashz.py](/examples/asyncserver-flash/post_flashz.py) example. It relies on `FlashZhttp` class methods to process POST form data but could be adjusted easily. Additional `platformio.ini` variables are used to set remote address of a board. Uploading compressed firmware/FS is done automagicaly via simple `pio run -t upload`. (MCU must be connected to network and reachable).

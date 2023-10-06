@@ -1,14 +1,16 @@
-ESP32-FlashZ - integration with AsynWebServer Example
+ESP32-FlashZ - integration with AsynWebServer and [pako](https://github.com/nodeca/pako) js lib Example
 ======
 
 A complete Platformio project that integrates AsyncWebServer with compressed OTA self-updates.
 It provides nothing but a very basic HTML form to upload compressed/uncompressed firmware and LittleFS update images.
+It uses pako js lib to on-the-fly gzip-compress uploaded files to be flashed via flashz lib on the MCU end.
 
 
-Use PlatformIO to build the project. Set your WiFi credentianls in `main.cpp` build and upload the code via serial initialy.
+Use PlatformIO to build the project. Set your WiFi credentianls in `main.cpp` build and upload the code and filesystem image via serial initialy.
 
 ```
 pio run -t upload
+pio run -t uploadfs
 ```
 
 Check the serial output, it should emit something like:
