@@ -73,12 +73,15 @@ To stich `FlashZ` with networking and OTA updates here is a `FlashZhttp` class. 
 
 ### Build-time options
 By default `AsyncWebServer` support is not build into lib, do not want to intorduce dependency for external lib.
-To get `AsyncWebServer` support, `FlashZ` lib **must** be build with `FZ_WITH_ASYNCSRV` flag. This could be done via PlatformIO build_flags. `AsyncWebServer` and `ESP32 WebServer` support options are mutually exclusive due to some definitions clashing.
+To get `AsyncWebServer` support, `FlashZ` lib **must** be build with `FZ_WITH_ASYNCSRV` flag. This could be done via PlatformIO [build_flags](https://docs.platformio.org/en/latest/projectconf/sections/env/options/build/build_flags.html). `AsyncWebServer` and `ESP32 WebServer` support options are mutually exclusive due to some definitions clashing.
 See [EXAMPLES](/examples/README.md) projects for further details.
 
 By default `FlashZhttp` class within the lib includes support for HTTP Client to be able to download and flash an image from a remote URL. It uses Arduino's `HTTPClient.h` lib for that, which ALWAYS includes SSL support, even if client code does not meant to be using it. SSL support makes a huge impact on resulting firmware image size, it grows in about 100-120k. If you do not need HTTP Client support for the sake of reducing resulting image size you can define `FZ_NOHTTPCLIENT` build flag to completely disable HTTP Client and allow linker exclude SSL-related code from the resulting firmware image. This is here untill I find a better way to workaround it, maybe a flag to exclude FlashZhttp completely?
 
-Also you **should** always specify `NO_GLOBAL_UPDATE` build flag for your project to prevent Arduino's UpdateClass creating it's instance by default. FlashZ uses it's own instance of a derived class and default one just wastes your memory (about 180 bytes). See [arduino-esp32/releases#8500](https://github.com/espressif/arduino-esp32/pull/8500 )
+Also you **should** always specify `NO_GLOBAL_UPDATE` build flag for your project to prevent Arduino's UpdateClass creating it's instance by default. FlashZ uses it's own instance of a derived class and default one just wastes your memory (about 180 bytes). See [arduino-esp32/pull#8500](https://github.com/espressif/arduino-esp32/pull/8500 )
+
+### On-the-fly compression of uploaded images via [pako](https://github.com/nodeca/pako) js lib
+An example of implementing firmware updating web page with embedded js code that compresses raw uploaded images on-the-fly could be found in [asyncserver-flashz-pakojs](examples/asyncserver-flashz-pakojs).
 
 ### Integration with PlatformIO
 It is pretty easy to integrate PlatformIO with HTTP OTA update via post build scripting. Python's zlib module could be used to compress firmware image after building and http-client module to upload a compressed image to  ESP32 board Over-the-Air. See a reference implementation in [post_flashz.py](/examples/asyncserver-flash/post_flashz.py) example. It relies on `FlashZhttp` class methods to process POST form data but could be adjusted easily. Additional `platformio.ini` variables are used to set remote address of a board. Uploading compressed firmware/FS is done automagicaly via simple `pio run -t upload`. (MCU must be connected to network and reachable).
