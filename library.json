@@ -24,7 +24,7 @@
         {"name": "Update", "platforms": "espressif32"},
         {"name": "Ticker", "platforms": "espressif32"}
     ],
-    "build": { "libCompatMode": "strict" },
+    "build": { "libCompatMode": "strict", "lib_ldf_mode":"off" },
     "export": {
         "include":
         [
