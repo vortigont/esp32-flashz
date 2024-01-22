@@ -6,7 +6,15 @@ name: PlatformIO CI
 
 on:
   push:
-    branches: [ main, feat ]
+#    branches: [ main, feat ]
+    paths:                                                                                                                                                    
+    - '**.ino'                                                                                                                                                
+    - '**.cpp'                                                                                                                                                
+    - '**.hpp'                                                                                                                                                
+    - '**.h'                                                                                                                                                  
+    - '**.c'                                                                                                                                                  
+    - '**.ini'                                                                                                                                                
+    - '**.yml'
   pull_request:
     branches: [ main ]
 
@@ -41,9 +49,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade platformio
-        pio update
+        #pio update
     - name: Run PlatformIO
       env: 
         PLATFORMIO_CI_SRC: ${{ matrix.example }}
       run: |
-        pio ci -c ${{ matrix.example }}/platformio.ini
+        cd ${{ matrix.example }} && platformio run -e flashz -e flashz_debug
+        #pio ci -c ${{ matrix.example }}/platformio.ini
