@@ -7,13 +7,12 @@ name: PlatformIO CI
 on:
   push:
 #    branches: [ main, feat ]
-    paths:                                                                                                                                                    
-    - '**.ino'                                                                                                                                                
-    - '**.cpp'                                                                                                                                                
-    - '**.hpp'                                                                                                                                                
-    - '**.h'                                                                                                                                                  
-    - '**.c'                                                                                                                                                  
-    - '**.ini'                                                                                                                                                
+    paths:
+    - '**.cpp'
+    - '**.hpp'
+    - '**.h'
+    - '**.c'
+    - '**.ini'
     - '**.yml'
   pull_request:
     branches: [ main ]

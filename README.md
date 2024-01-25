@@ -1,9 +1,10 @@
 ESP32-FlashZ
-an arduino library that provides zlib compressed OTA update feature for esp32
 ======
 
-__[EXAMPLES](/examples/README.md) | [CHANGELOG](/CHANGELOG.md) |__ [![PlatformIO
- CI](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml/badge.svg)](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml)
+### an arduino library that provides zlib compressed OTA update feature for esp32
+
+__[EXAMPLES](/examples/README.md) | [CHANGELOG](/CHANGELOG.md) | [![PlatformIO
+ CI](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml/badge.svg)](https://github.com/vortigont/esp32-flashz/actions/workflows/pio_build.yml) | [![PlatformIO Registry](https://badges.registry.platformio.org/packages/vortigont/library/esp32-flashz.svg)](https://registry.platformio.org/libraries/vortigont/esp32-flashz) |__
 
 
 Unlike [esp8266](https://github.com/esp8266/Arduino/pull/6820/commits/67ba90d3eaf01c5400d0b42cdce05ef9295d8c16), esp32's bootloader does not (yet) support compressed image updates. But esp32 has a miniz lib decompressor in ROM, so it can be used to decompress zlib packed stream on the fly during OTA update and write decompressed data to SPI flash. This could be done both for firmware and filesystem image.

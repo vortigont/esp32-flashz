@@ -1,5 +1,10 @@
 # Change Log
 
+## v 1.1.3 (2024-01-26)
+ + example for on-the-fly compression via pako.js lib
+ * make exaples more CI friendly
+ * minor cleanup
+
 ## v 1.1.2 (2023-05-20)
  + add `FZ_NOHTTPCLIENT` build-time flag to exclude HTTP Client support for the sake of reduced binary size
  * more safety for dynamic objects
