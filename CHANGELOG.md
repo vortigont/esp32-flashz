@@ -1,5 +1,8 @@
 # Change Log
 
+## v 1.1.4 (2024-05-28)
+ * fixes for arduino-esp32 3.x.x (thanks to @tobozo)
+
 ## v 1.1.3 (2024-01-26)
  + example for on-the-fly compression via pako.js lib
  * make exaples more CI friendly
