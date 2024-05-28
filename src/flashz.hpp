@@ -29,13 +29,29 @@
 
 
 #pragma once
+
+// arduino-esp32 core 2.x => 3.x migration
 #if __has_include("miniz.h")
-  #include "miniz.h"
+    #include "miniz.h"
 #else
-  #include <rom/miniz.h>
+    #include <rom/miniz.h>
 #endif
+
 #include <Update.h>
 #include <functional>
+
+// arduino-esp32 core 2.x => 3.x migration
+#if !defined SPI_FLASH_SEC_SIZE
+    #include "spi_flash_mmap.h"
+#endif
+
+// arduino-esp32 core 2.x => 3.x migration
+#if __has_include(<NetworkClient.h>)
+    #include <NetworkClient.h>
+    #define WiFiClient NetworkClient
+#else
+    #include <WiFiClient.h>
+#endif
 
 #ifndef ESP_IMAGE_HEADER_MAGIC
 #define ESP_IMAGE_HEADER_MAGIC  0xE9
