@@ -29,7 +29,11 @@
 
 
 #pragma once
-#include <rom/miniz.h>
+#if __has_include("miniz.h")
+  #include "miniz.h"
+#else
+  #include <rom/miniz.h>
+#endif
 #include <Update.h>
 #include <functional>
 
