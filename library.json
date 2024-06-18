@@ -17,7 +17,7 @@
     "license": "GPL-2.0",
     "repository": {
         "type": "git",
-        "url": "https://github.com/vortigont/espem-flashz.git"
+        "url": "https://github.com/vortigont/esp32-flashz.git"
     },
     "dependencies":
     [
