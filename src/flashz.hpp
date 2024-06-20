@@ -53,6 +53,9 @@
     #include <WiFiClient.h>
 #endif
 
+// this header is required for FlashZhttp class, but Platformio's LDF needs it in main lib's header file to build dependency graph properly
+#include <Ticker.h>
+
 #ifndef ESP_IMAGE_HEADER_MAGIC
 #define ESP_IMAGE_HEADER_MAGIC  0xE9
 #endif
