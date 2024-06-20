@@ -19,7 +19,7 @@
         "type": "git",
         "url": "https://github.com/vortigont/esp32-flashz.git"
     },
-    "build": { "libCompatMode": "strict", "lib_ldf_mode":"off" },
+    "build": { "libCompatMode": "strict", "lib_ldf_mode":"chain+" },
     "export": {
         "include":
         [
