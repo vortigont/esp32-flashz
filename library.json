@@ -22,8 +22,8 @@
     "build": { "libCompatMode": "soft", "lib_ldf_mode":"deep+" },
     "dependencies":
     [
-        {"name": "Update", "platforms": "espressif32"},
-        {"name": "Ticker", "platforms": "espressif32"}
+        {"name": "Update" },
+        {"name": "Ticker" }
     ],
     "export": {
         "include":
