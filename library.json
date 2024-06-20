@@ -18,11 +18,6 @@
         "type": "git",
         "url": "https://github.com/vortigont/esp32-flashz.git"
     },
-    "dependencies":
-    [
-        {"name": "Update" },
-        {"name": "Ticker" }
-    ],
     "export": {
         "include":
         [
