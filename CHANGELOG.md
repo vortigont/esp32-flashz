@@ -1,5 +1,11 @@
 # Change Log
 
+## v 1.1.5 (2024-06-21)
+ - minor fixups
+ - remove internal arduino's libs dependency from manifest
+ - pio_build workflows use local lib to build examples
+ * add release announce via Telegram bot
+
 ## v 1.1.4 (2024-05-28)
  * fixes for arduino-esp32 3.x.x (thanks to @tobozo)
 
