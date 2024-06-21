@@ -36,8 +36,16 @@
 #endif
 
 #ifndef  FZ_NOHTTPCLIENT
+// arduino-esp32 core 2.x => 3.x migration
+#if __has_include(<NetworkClient.h>)
+  #include <NetworkClient.h>
+  #define WiFiClient NetworkClient
+#else
+  #include <WiFiClient.h>
+#endif  // __has_include(<NetworkClient.h>)
+
 #include <HTTPClient.h>
-#endif
+#endif  // FZ_NOHTTPCLIENT
 
 #ifdef ARDUINO
 #include "esp32-hal-log.h"
