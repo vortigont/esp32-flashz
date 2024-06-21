@@ -22,11 +22,11 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        example:
-          - "examples/asyncserver-flashz"
-          - "examples/httpserver-flashz"
+    #strategy:
+    #  matrix:
+    #    example:
+    #      - "examples/asyncserver-flashz"
+    #      - "examples/httpserver-flashz"
 
     steps:
     - uses: actions/checkout@v4
@@ -36,11 +36,6 @@ jobs:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: ${{ runner.os }}-pip-
-    - name: Cache PlatformIO
-      uses: actions/cache@v4
-      with:
-        path: ~/.platformio
-        key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
     - name: Set up Python 3.x
       uses: actions/setup-python@v5
       with:
@@ -50,9 +45,34 @@ jobs:
         python -m pip install --upgrade pip
         pip install --upgrade platformio
         #pio update
-    - name: Run PlatformIO
-      env: 
-        PLATFORMIO_CI_SRC: ${{ matrix.example }}
+    - name: Prepare examples for local build
       run: |
-        cd ${{ matrix.example }} && platformio run -e flashz -e flashz_debug
+        pwd
+        #ls -l
+        mkdir ~/wrk
+        mv examples/asyncserver-flashz ~/wrk/
+        mv examples/httpserver-flashz ~/wrk/
+        mkdir -p ~/wrk/asyncserver-flashz/lib/esp32-flashz ~/wrk/httpserver-flashz/lib/esp32-flashz
+        cp -r ./src ~/wrk/asyncserver-flashz/lib/esp32-flashz
+        cp -r ./src ~/wrk/httpserver-flashz/lib/esp32-flashz
+        cp library.json ~/wrk/asyncserver-flashz/lib/esp32-flashz/
+        cp library.json ~/wrk/httpserver-flashz/lib/esp32-flashz/
+        ls -l ~/wrk/
+        #cd ${{ matrix.example }} && platformio run -e flashz -e flashz_debug
         #pio ci -c ${{ matrix.example }}/platformio.ini
+    - name: Run Build for Async server
+      #env: 
+      #  PLATFORMIO_CI_SRC: ${{ matrix.example }}
+      run: |
+        cd ~/wrk/asyncserver-flashz
+        platformio run -e esp32 -e esp32-s2 -e esp32c3
+        cd ~/wrk/httpserver-flashz
+        platformio run -e esp32 -e esp32-s2 -e esp32c3
+        #cd ${{ matrix.example }} && platformio run -e flashz -e flashz_debug
+        #pio ci -c ${{ matrix.example }}/platformio.ini
+    - name: Run Build for HTTP Server
+      #env: 
+      #  PLATFORMIO_CI_SRC: ${{ matrix.example }}
+      run: |
+        cd ~/wrk/httpserver-flashz
+        platformio run -e esp32 -e esp32-s2 -e esp32c3
