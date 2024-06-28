@@ -168,7 +168,7 @@ int Inflator::inflate_block_to_cb(const uint8_t* inBuff, size_t len, inflate_cb_
              *
              */
             while (!dict_free || (final && (bool)deco_data_len) || (deco_data_len >= chunk_size)){
-                ESP_LOGD(TAG, "CB - idx:%u, head:%u, dbgn:%u, dend:%u, ddatalen:%u, avin:%u, tin:%u, tout:%u, fin:%d", total_out, dictBuff, dict_begin, dict_offset, deco_data_len, avail_in, total_in, total_out, final);  //  && (err == MZ_STREAM_END)
+                ESP_LOGD(TAG, "CB - idx:%u, head:%u, dbgn:%u, dend:%u, ddatalen:%u, avin:%u, tin:%u, tout:%u, fin:%d", total_out, (uint32_t)dictBuff, dict_begin, dict_offset, deco_data_len, avail_in, total_in, total_out, final);  //  && (err == MZ_STREAM_END)
 
                 // callback can consume only a portion of data from dict
                 size_t consumed = callback(total_out - deco_data_len, dictBuff + dict_begin, deco_data_len, final && err == MZ_STREAM_END);
