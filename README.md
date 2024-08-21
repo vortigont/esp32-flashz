@@ -20,6 +20,8 @@ The code inspired by [esptool](https://github.com/espressif/esptool) that does t
  * stream decompression, i.e. via [http client](https://github.com/espressif/arduino-esp32/tree/master/libraries/HTTPClient) (fetch and flash compressed image from remote URL)
  * PlatformIO integration via [post_flash.py](/examples/asyncserver-flash/post_flash.py) script that automates on-the-fly compression and OTA upload for your project
  * on-the-fly compressed upload example via [pako](https://github.com/nodeca/pako) js lib (tnx to @playmiel for contribution)
+ * `esp32-flashz` is used in [BLEOTA](https://github.com/gb88/BLEOTA/) library to upload updates to esp32 via BlueTooth
+
 
 ### Requirements
  * 32k of heap memory during decompression for dict data
@@ -107,6 +109,7 @@ I'm a linux user and prefer to use cli tools for automating tasks rather than we
  - trigger esp32's FS self-update from a remote host
 
 `curl http://$ESPHOST/update -F "img=fs" -F "url=http://$REMOTE/download/littlefs.bin.zz"`
+
 
 
 ### License
