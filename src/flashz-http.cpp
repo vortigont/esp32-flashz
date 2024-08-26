@@ -118,10 +118,16 @@ void FlashZhttp::handle_ota_form(AsyncWebServer *srv, const char* url){
                     request->send(503, PGmimetxt, "Update FAILED");
                 } else {
                     if (rst_timeout){
-                        if (!t)
-                            t = new Ticker;
+                        if (!_tmr){
+                            _tmr = xTimerCreate(TAG,
+                                        pdMS_TO_TICKS(rst_timeout),
+                                        pdFALSE,                                    // one time timer
+                                        static_cast<void*>(this),
+                                        [](TimerHandle_t h) { ESP.restart(); }
+                                    );
+                        }
 
-                        t->once_ms(rst_timeout, [](){ ESP.restart(); });
+                        xTimerReset( _tmr, portMAX_DELAY );
                     }
                     request->send(200, PGmimetxt, "OTA complete, autoreboot in 5 sec...");
                 }
@@ -247,10 +253,16 @@ fz_http_err_t FlashZhttp::_http_get(const char* url, int imgtype){
     }
 
     if (rst_timeout){
-        if (!t)
-            t = new Ticker;
+        if (!_tmr){
+            _tmr = xTimerCreate(TAG,
+                        pdMS_TO_TICKS(rst_timeout),
+                        pdFALSE,                                    // one time timer
+                        static_cast<void*>(this),
+                        [](TimerHandle_t h) { ESP.restart(); }
+                    );
+        }
 
-        t->once_ms(rst_timeout, [](){ ESP.restart(); });
+        xTimerReset( _tmr, portMAX_DELAY );
     }
 
     return fz_http_err_t::ok;
@@ -279,14 +291,20 @@ void FlashZhttp::handle_ota_form(WebServer *server, const char* url){
                 server->send(500, PGmimetxt, "UPDATE FAILED");
             } else {
                 if (rst_timeout){
-                    if (!t)
-                        t = new Ticker;
+                    if (!_tmr){
+                        _tmr = xTimerCreate(TAG,
+                                    pdMS_TO_TICKS(rst_timeout),
+                                    pdFALSE,                                    // one time timer
+                                    static_cast<void*>(this),
+                                    [](TimerHandle_t h) { ESP.restart(); }
+                                );
+                    }
 
-                    t->once_ms(rst_timeout, [](){ ESP.restart(); });
+                    xTimerReset( _tmr, portMAX_DELAY );
                 }
 
                 server->client().setNoDelay(true);
-                server->send(200, PGmimetxt, F("OTA complete, autoreboot in 5 sec..."));
+                server->send(200, PGmimetxt, "OTA complete, autoreboot in 5 sec...");
                 server->client().stop();
             }
         }
@@ -374,9 +392,17 @@ unsigned FlashZhttp::autoreboot(unsigned t){
 #ifndef FZ_NOHTTPCLIENT
 void FlashZhttp::fetch_async(const char* url, int imgtype, int delay){
     if (!cb){ cb = new callback_arg_t(imgtype, url); }
-    if (!t) t = new Ticker;
-    // have no idea why, but C3 bootloops here, needs investigation
-    t->once_ms(delay, FlashZhttp::_fz_http_trigger, this);
+    if (!_tmr){
+        _tmr = xTimerCreate(TAG,
+                    pdMS_TO_TICKS(delay),
+                    pdFALSE,                                    // one time timer
+                    static_cast<void*>(this),
+                    [](TimerHandle_t h) { ESP.restart(); }
+                );
+    }
+
+    xTimerReset( _tmr, portMAX_DELAY );
+
     _err = fz_http_err_t::pending;
 }
 #endif  //FZ_NOHTTPCLIENT
