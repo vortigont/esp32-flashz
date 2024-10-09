@@ -16,10 +16,10 @@ The code inspired by [esptool](https://github.com/espressif/esptool) that does t
  * low code overhead, deco algo is already present in ROM
  * both firmware and filesystem compressed images upload supported
  * compatible with ESP32 [WebServer](https://github.com/espressif/arduino-esp32/tree/master/libraries/WebServer), autodetect compressed/non-compressed images
- * compatible with [AsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer), autodetect compressed/non-compressed images
+ * compatible with [ESPAsyncWebServer](https://github.com/mathieucarbou/ESPAsyncWebServer/)), autodetect compressed/non-compressed images
  * stream decompression, i.e. via [http client](https://github.com/espressif/arduino-esp32/tree/master/libraries/HTTPClient) (fetch and flash compressed image from remote URL)
  * PlatformIO integration via [post_flash.py](/examples/asyncserver-flash/post_flash.py) script that automates on-the-fly compression and OTA upload for your project
- * on-the-fly compressed upload example via [pako](https://github.com/nodeca/pako) js lib (tnx to @playmiel for contribution)
+ * on-the-fly compress/decompress upload from browser example via [pako](https://github.com/nodeca/pako) js lib (tnx to @playmiel for contribution)
  * `esp32-flashz` is used in [BLEOTA](https://github.com/gb88/BLEOTA/) library to upload updates to esp32 via BlueTooth
 
 
