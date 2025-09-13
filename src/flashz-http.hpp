@@ -29,14 +29,15 @@
 
 #pragma once
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
+
 #ifdef FZ_WITH_ASYNCSRV
 #include <ESPAsyncWebServer.h>
 #define FZ_NO_WEBSRV
 #else
 #include <WebServer.h>
 #endif  // #ifdef FZ_WITH_ASYNCSRV
-
-#include <Ticker.h>
 
 #define FZ_REBOOT_TIMEOUT  5000
 #define FZ_HTTP_CLIENT_DELAY    1000
@@ -67,7 +68,7 @@ enum class fz_http_err_t:int {
  */
 class FlashZhttp {
     unsigned rst_timeout = FZ_REBOOT_TIMEOUT;
-    Ticker *t = nullptr;
+    TimerHandle_t _tmr{nullptr};
 
 #ifndef  FZ_NOHTTPCLIENT
     struct callback_arg_t {
@@ -95,7 +96,11 @@ class FlashZhttp {
 
 public:
     ~FlashZhttp(){
-        delete t; t = nullptr;
+    if (_tmr){
+        xTimerStop(_tmr, portMAX_DELAY );
+        xTimerDelete(_tmr, portMAX_DELAY );
+    }
+
 #ifndef  FZ_NOHTTPCLIENT
         delete cb;
         cb = nullptr;
